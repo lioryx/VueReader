@@ -1,8 +1,5 @@
-<script setup lang="ts">
-</script>
-
 <template>
-  <h1>Hello World</h1>
+  <div class="h-screen overflow-hidden">
+    <router-view />
+  </div>
 </template>
-
-<style scoped></style>

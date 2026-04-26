@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vue-tsc *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(pnpm build-only *)",
+      "Bash(pnpm install *)",
+      "Bash(pkill -f \"vite\")"
+    ]
+  }
+}
