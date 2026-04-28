@@ -311,8 +311,7 @@ function stopTTS() {
       :class="settings.pageMode === 'page' ? 'select-none' : 'overflow-y-auto'" @click="onContentClick">
       <!-- Scroll mode -->
       <template v-if="settings.pageMode === 'scroll'">
-        <!-- pt-16 clears the floating top bar; pb-24 clears the bottom bar -->
-        <div class="max-w-2xl mx-auto px-5 pt-16 pb-6">
+        <div class="max-w-2xl mx-auto px-5 pb-6" style="padding-top: calc(env(safe-area-inset-top) + 4rem)">
           <h2 v-if="reader.currentChapter" class="text-center text-sm font-semibold mb-6 opacity-50">
             {{ reader.currentChapter.title }}
           </h2>
@@ -342,7 +341,7 @@ function stopTTS() {
       <!-- pt/pb reserve fixed space matching the floating bar heights so
            pagination is computed against the same area regardless of bar state -->
       <template v-else>
-        <div class="absolute inset-0 flex flex-col">
+        <div class="absolute inset-0 flex flex-col" style="padding-top: env(safe-area-inset-top)">
           <!-- pageTextAreaEl: measured by updateCharsPerPage -->
           <div ref="pageTextAreaEl" class="relative flex-1 overflow-hidden">
             <Transition :name="pageTransition">
@@ -374,7 +373,7 @@ function stopTTS() {
     </div>
 
     <!-- ── Top overlay: progress bar + top bar + TTS bar stacked ──────────── -->
-    <div class="absolute top-0 inset-x-0 z-20 flex flex-col pointer-events-none">
+    <div class="absolute top-0 inset-x-0 z-20 flex flex-col pointer-events-none" style="padding-top: env(safe-area-inset-top)">
       <!-- Progress bar: always visible -->
       <div class="h-0.5 w-full opacity-30 flex-shrink-0">
         <div class="h-full bg-indigo-500 transition-[width] duration-500"

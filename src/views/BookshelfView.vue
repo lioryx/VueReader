@@ -116,7 +116,7 @@ async function onDrop(e: DragEvent) {
     @drop="onDrop"
   >
     <!-- Navbar -->
-    <div class="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+    <div class="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
       <h1 class="text-lg font-bold text-gray-900">书架</h1>
       <div class="flex items-center gap-3">
         <button

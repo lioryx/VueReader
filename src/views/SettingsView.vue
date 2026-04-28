@@ -165,7 +165,7 @@ async function importBackup(file: File) {
 <template>
   <div class="h-screen flex flex-col bg-gray-50">
     <!-- Navbar -->
-    <div class="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100">
+    <div class="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
       <button class="p-1 -ml-1 text-gray-600" @click="router.back()">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
