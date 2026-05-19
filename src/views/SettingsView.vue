@@ -1,382 +1,224 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { presetThemes, useSettingsStore } from '@/stores/useSettingsStore'
-import { db, type Book, type BookContent, type Chapter, type Progress, type Bookmark } from '@/db'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 
 const router = useRouter()
 const settings = useSettingsStore()
 
-const themes = presetThemes
+const themeModeLabel = computed(() =>
+  settings.themeMode === 'eink' ? 'E-Ink(墨水屏)' : '标准模式',
+)
 
-const showAddTheme = ref(false)
-const newTheme = ref({ label: '', bg: '#e8f5e9', text: '#1b5e20' })
-
-const themePreviewStyle = computed(() => ({
-  backgroundColor: settings.currentTheme.bg,
-  color: settings.currentTheme.text,
-  borderColor: settings.isDark ? '#374151' : '#d1d5db',
-  fontSize: `${settings.fontSize}px`,
-  lineHeight: String(settings.lineHeight),
+const pageStyle = computed(() => ({
+  '--settings-page-bg': settings.appPalette.pageBg,
+  '--settings-header-bg': settings.appPalette.headerBg,
+  '--settings-surface-bg': settings.appPalette.surfaceBg,
+  '--settings-surface-muted': settings.appPalette.surfaceMuted,
+  '--settings-border': settings.appPalette.border,
+  '--settings-text': settings.appPalette.text,
+  '--settings-text-secondary': settings.appPalette.textSecondary,
+  '--settings-text-muted': settings.appPalette.textMuted,
+  '--settings-primary-bg': settings.appPalette.primaryBg,
+  '--settings-primary-text': settings.appPalette.primaryText,
+  '--settings-primary-soft-bg': settings.appPalette.primarySoftBg,
+  '--settings-primary-soft-text': settings.appPalette.primarySoftText,
 }))
 
-function perceivedLuminance(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
-  return 0.299 * r + 0.587 * g + 0.114 * b
-}
-
-function saveCustomTheme() {
-  if (!newTheme.value.label.trim()) return
-  const id = `custom-${Date.now()}`
-  settings.customThemes.push({
-    id,
-    label: newTheme.value.label.trim(),
-    bg: newTheme.value.bg,
-    text: newTheme.value.text,
-    dark: perceivedLuminance(newTheme.value.bg) < 0.5,
-  })
-  settings.theme = id
-  newTheme.value = { label: '', bg: '#e8f5e9', text: '#1b5e20' }
-  showAddTheme.value = false
-}
-
-function deleteCustomTheme(id: string) {
-  const idx = settings.customThemes.findIndex((t) => t.id === id)
-  if (idx !== -1) settings.customThemes.splice(idx, 1)
-  if (settings.theme === id) settings.theme = 'light'
-}
-
-function adjustFontSize(delta: number) {
-  settings.fontSize = Math.min(28, Math.max(12, settings.fontSize + delta))
-}
-
-function adjustLineHeight(delta: number) {
-  settings.lineHeight = Math.round(Math.min(3.0, Math.max(1.2, settings.lineHeight + delta)) * 10) / 10
-}
-
-function adjustTtsRate(delta: number) {
-  settings.ttsRate = Math.round(Math.min(2.0, Math.max(0.5, settings.ttsRate + delta)) * 10) / 10
-}
-
-// ── Backup ──────────────────────────────────────────────────────────────────
-
-interface BackupData {
-  version: number
-  exportedAt: string
-  books: Book[]
-  contents: BookContent[]
-  chapters: Chapter[]
-  progress: Progress[]
-  bookmarks: Bookmark[]
-}
-
-// ── Reading stats ────────────────────────────────────────────────────────────
-const totalReadSecs = ref(0)
-const totalBooks = ref(0)
-
-onMounted(async () => {
-  const [allProgress, allBooks] = await Promise.all([db.progress.toArray(), db.books.toArray()])
-  totalReadSecs.value = allProgress.reduce((s, p) => s + (p.totalSeconds ?? 0), 0)
-  totalBooks.value = allBooks.length
-})
-
-function formatTime(secs: number): string {
-  if (secs < 60) return '< 1 分钟'
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  return h > 0 ? `${h} 小时 ${m} 分钟` : `${m} 分钟`
-}
-
-// ── Backup ──────────────────────────────────────────────────────────────────
-
-const exporting = ref(false)
-const importing = ref(false)
-const backupMessage = ref('')
-const backupFileInput = ref<HTMLInputElement | null>(null)
-
-async function exportBackup() {
-  exporting.value = true
-  backupMessage.value = ''
-  try {
-    const [books, contents, chapters, progress, bookmarks] = await Promise.all([
-      db.books.toArray(),
-      db.contents.toArray(),
-      db.chapters.toArray(),
-      db.progress.toArray(),
-      db.bookmarks.toArray(),
-    ])
-    const data: BackupData = { version: 1, exportedAt: new Date().toISOString(), books, contents, chapters, progress, bookmarks }
-    const blob = new Blob([JSON.stringify(data)], { type: 'application/json; charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `jingdu-backup-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    backupMessage.value = `已导出 ${books.length} 本书`
-  } catch (e) {
-    backupMessage.value = `导出失败: ${String(e)}`
-  } finally {
-    exporting.value = false
-  }
-}
-
-function onBackupFileChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) void importBackup(file)
-    ; (e.target as HTMLInputElement).value = ''
-}
-
-async function importBackup(file: File) {
-  if (!confirm('导入备份将覆盖当前所有书架数据，是否继续？')) return
-  importing.value = true
-  backupMessage.value = ''
-  try {
-    const json = await file.text()
-    const data = JSON.parse(json) as BackupData
-    if (data.version !== 1 || !Array.isArray(data.books)) throw new Error('无效的备份文件格式')
-
-    // Restore dates from ISO strings
-    const books = data.books.map((b) => ({ ...b, importedAt: new Date(b.importedAt) }))
-    const progress = data.progress.map((p) => ({ ...p, updatedAt: new Date(p.updatedAt) }))
-    const bookmarks = data.bookmarks.map((bm) => ({ ...bm, createdAt: new Date(bm.createdAt) }))
-
-    await db.transaction('rw', [db.books, db.contents, db.chapters, db.progress, db.bookmarks], async () => {
-      await db.books.clear()
-      await db.contents.clear()
-      await db.chapters.clear()
-      await db.progress.clear()
-      await db.bookmarks.clear()
-      if (books.length) await db.books.bulkPut(books)
-      if (data.contents.length) await db.contents.bulkPut(data.contents)
-      if (data.chapters.length) await db.chapters.bulkPut(data.chapters)
-      if (progress.length) await db.progress.bulkPut(progress)
-      if (bookmarks.length) await db.bookmarks.bulkPut(bookmarks)
-    })
-    backupMessage.value = `已恢复 ${books.length} 本书`
-  } catch (e) {
-    backupMessage.value = `导入失败: ${String(e)}`
-  } finally {
-    importing.value = false
-  }
+function open(path: string) {
+  void router.push(path)
 }
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-gray-50">
-    <!-- Navbar -->
-    <div class="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
-      <button class="p-1 -ml-1 text-gray-600" @click="router.back()">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-      <h1 class="text-base font-semibold text-gray-800">设置</h1>
+  <div class="settings-home h-screen flex flex-col" :style="pageStyle">
+    <div class="px-4 pb-4 pt-6 border-b" style="padding-top: calc(env(safe-area-inset-top) + 1rem)">
+      <div class="flex items-center gap-3">
+        <button class="p-1 -ml-1 text-gray-600" @click="router.back()">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h1 class="text-lg font-semibold">设置</h1>
+      </div>
     </div>
 
-    <!-- Settings list -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-3">
-      <!-- Font size -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">字体大小</p>
-        <div class="flex items-center gap-4">
-          <button
-            class="w-9 h-9 rounded-full bg-gray-100 text-xl font-bold text-gray-700 flex items-center justify-center active:bg-gray-200 disabled:opacity-40"
-            :disabled="settings.fontSize <= 12" @click="adjustFontSize(-1)">
-            −
-          </button>
-          <span class="flex-1 text-center text-xl font-semibold text-gray-800">{{ settings.fontSize }}px</span>
-          <button
-            class="w-9 h-9 rounded-full bg-gray-100 text-xl font-bold text-gray-700 flex items-center justify-center active:bg-gray-200 disabled:opacity-40"
-            :disabled="settings.fontSize >= 28" @click="adjustFontSize(1)">
-            +
-          </button>
-        </div>
-        <p class="mt-3 text-gray-500" :style="{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight }">
-          预览文字效果，静读带你畅游书海。
-        </p>
-      </div>
+    <div class="flex-1 overflow-y-auto">
+      <section class="bg-white px-4 py-2">
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/rules/toc')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5.5A2.5 2.5 0 016.5 3H20v16H6.5A2.5 2.5 0 004 21.5v-16z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">TXT 目录规则</span>
+            <span class="block mt-2 text-sm text-gray-400">配置 TXT 目录规则</span>
+          </span>
+        </button>
 
-      <!-- Line height -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">行间距</p>
-        <div class="flex items-center gap-4">
-          <button
-            class="w-9 h-9 rounded-full bg-gray-100 text-xl font-bold text-gray-700 flex items-center justify-center active:bg-gray-200 disabled:opacity-40"
-            :disabled="settings.lineHeight <= 1.2" @click="adjustLineHeight(-0.1)">
-            −
-          </button>
-          <span class="flex-1 text-center text-xl font-semibold text-gray-800">{{ settings.lineHeight.toFixed(1)
-            }}</span>
-          <button
-            class="w-9 h-9 rounded-full bg-gray-100 text-xl font-bold text-gray-700 flex items-center justify-center active:bg-gray-200 disabled:opacity-40"
-            :disabled="settings.lineHeight >= 3.0" @click="adjustLineHeight(0.1)">
-            +
-          </button>
-        </div>
-      </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/rules/replace')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900 font-semibold text-base">A↔B</span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">替换净化</span>
+            <span class="block mt-2 text-sm text-gray-400">配置替换净化规则</span>
+          </span>
+        </button>
 
-      <!-- Font family -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">字体风格</p>
-        <div class="flex gap-2">
-          <button
-            v-for="f in [{ value: 'system' as const, label: '正文体' }, { value: 'serif' as const, label: '衬线体' }, { value: 'mono' as const, label: '等宽体' }]"
-            :key="f.value" class="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all" :class="settings.fontFamily === f.value
-                ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'
-              " @click="settings.fontFamily = f.value">
-            {{ f.label }}
-          </button>
-        </div>
-      </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/rules/dictionary')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900 font-semibold text-base">文A</span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">字典规则</span>
+            <span class="block mt-2 text-sm text-gray-400">配置字典规则</span>
+          </span>
+        </button>
 
-      <!-- Reading mode -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">翻页模式</p>
-        <div class="flex gap-2">
-          <button class="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all" :class="settings.pageMode === 'scroll'
-              ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-              : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'
-            " @click="settings.pageMode = 'scroll'">
-            滚动
-          </button>
-          <button class="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-all" :class="settings.pageMode === 'page'
-              ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-              : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'
-            " @click="settings.pageMode = 'page'">
-            翻页
-          </button>
-        </div>
-      </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/theme-mode')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 4h6l1 3h3v13H5V7h3l1-3z" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">主题模式</span>
+            <span class="block mt-2 text-sm text-gray-400">选择主题模式</span>
+          </span>
+          <span class="rounded-full bg-gray-200 px-4 py-2 text-sm text-gray-700">{{ themeModeLabel }}</span>
+        </button>
+      </section>
 
-      <!-- TTS rate -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">朗读速度</p>
-        <div class="flex items-center gap-4">
-          <button
-            class="w-9 h-9 rounded-full bg-gray-100 text-xl font-bold text-gray-700 flex items-center justify-center active:bg-gray-200 disabled:opacity-40"
-            :disabled="settings.ttsRate <= 0.5" @click="adjustTtsRate(-0.1)">
-            −
-          </button>
-          <span class="flex-1 text-center text-xl font-semibold text-gray-800">{{ settings.ttsRate.toFixed(1) }}x</span>
-          <button
-            class="w-9 h-9 rounded-full bg-gray-100 text-xl font-bold text-gray-700 flex items-center justify-center active:bg-gray-200 disabled:opacity-40"
-            :disabled="settings.ttsRate >= 2.0" @click="adjustTtsRate(0.1)">
-            +
-          </button>
-        </div>
-      </div>
+      <section class="mt-4 bg-white px-4 py-2">
+        <h2 class="py-3 text-base font-semibold">设置</h2>
 
-      <!-- Theme -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">阅读主题</p>
-        <div class="flex flex-wrap gap-2">
-          <!-- Built-in themes -->
-          <button v-for="t in themes" :key="t.id"
-            class="py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all flex items-center gap-1.5"
-            :class="settings.theme === t.id ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'"
-            @click="settings.theme = t.id">
-            <span class="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
-              :style="{ backgroundColor: t.bg }" />
-            {{ t.label }}
-          </button>
-          <!-- Custom themes -->
-          <div v-for="t in settings.customThemes" :key="t.id" class="relative">
-            <button class="py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all flex items-center gap-1.5"
-              :class="settings.theme === t.id ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'"
-              @click="settings.theme = t.id">
-              <span class="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
-                :style="{ backgroundColor: t.bg }" />
-              {{ t.label }}
-            </button>
-            <button
-              class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 text-white text-[10px] flex items-center justify-center leading-none"
-              @click.stop="deleteCustomTheme(t.id)">×</button>
-          </div>
-          <!-- Add custom theme -->
-          <button
-            class="py-2 px-3 rounded-lg text-sm border-2 border-dashed border-gray-300 text-gray-400 active:bg-gray-50 transition-colors"
-            @click="showAddTheme = !showAddTheme">＋</button>
-        </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/backup')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">备份与恢复</span>
+            <span class="block mt-2 text-sm text-gray-400">WebDav 设置/导入旧版本数据</span>
+          </span>
+        </button>
 
-        <!-- Add theme form -->
-        <div v-if="showAddTheme" class="mt-3 p-3 rounded-lg border border-gray-200 space-y-3">
-          <input v-model="newTheme.label" type="text" placeholder="主题名称"
-            class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400" />
-          <div class="flex items-center gap-5">
-            <label class="flex items-center gap-2 text-sm text-gray-600">
-              背景色
-              <input type="color" v-model="newTheme.bg" class="w-8 h-8 cursor-pointer rounded border-0" />
-            </label>
-            <label class="flex items-center gap-2 text-sm text-gray-600">
-              文字色
-              <input type="color" v-model="newTheme.text" class="w-8 h-8 cursor-pointer rounded border-0" />
-            </label>
-          </div>
-          <div class="rounded-lg p-2 text-sm border border-gray-200 transition-colors"
-            :style="{ backgroundColor: newTheme.bg, color: newTheme.text }">
-            预览：在静读中享受阅读的乐趣。
-          </div>
-          <div class="flex gap-2">
-            <button
-              class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium active:bg-indigo-700 transition-colors"
-              @click="saveCustomTheme">保存</button>
-            <button
-              class="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm active:bg-gray-200 transition-colors"
-              @click="showAddTheme = false">取消</button>
-          </div>
-        </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/theme')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 4h6l1 3h3v13H5V7h3l1-3z" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">主题设置</span>
+            <span class="block mt-2 text-sm text-gray-400">与界面/颜色相关的一些设置</span>
+          </span>
+        </button>
 
-        <!-- Theme preview -->
-        <div class="mt-3 rounded-lg p-3 text-sm border transition-colors" :style="themePreviewStyle">
-          预览：在静读中享受阅读的乐趣，文字的海洋等你来探索。
-        </div>
-      </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/other')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v12M6 12h12" />
+              <circle cx="12" cy="12" r="9" stroke-width="1.8" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">其它设置</span>
+            <span class="block mt-2 text-sm text-gray-400">与功能相关的一些设置</span>
+          </span>
+        </button>
+      </section>
 
-      <!-- Reading stats -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">阅读统计</p>
-        <div class="flex gap-3">
-          <div class="flex-1 bg-indigo-50 rounded-xl p-3 text-center">
-            <p class="text-2xl font-bold text-indigo-600">{{ totalBooks }}</p>
-            <p class="text-xs text-gray-500 mt-0.5">本书</p>
-          </div>
-          <div class="flex-1 bg-indigo-50 rounded-xl p-3 text-center">
-            <p class="text-lg font-bold text-indigo-600 leading-tight">{{ formatTime(totalReadSecs) }}</p>
-            <p class="text-xs text-gray-500 mt-0.5">总阅读时长</p>
-          </div>
-        </div>
-      </div>
+      <section class="mt-4 bg-white px-4 py-2 pb-8">
+        <h2 class="py-3 text-base font-semibold">其它</h2>
 
-      <!-- Backup -->
-      <div class="bg-white rounded-xl p-4 shadow-sm">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">数据备份</p>
-        <div class="flex gap-2">
-          <button
-            class="flex-1 py-2.5 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-600 active:bg-indigo-100 disabled:opacity-60 transition-colors"
-            :disabled="exporting" @click="exportBackup">
-            {{ exporting ? '导出中…' : '导出备份' }}
-          </button>
-          <button
-            class="flex-1 py-2.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 active:bg-gray-200 disabled:opacity-60 transition-colors"
-            :disabled="importing" @click="backupFileInput?.click()">
-            {{ importing ? '导入中…' : '导入备份' }}
-          </button>
-        </div>
-        <input ref="backupFileInput" type="file" accept=".json" class="hidden" @change="onBackupFileChange" />
-        <p v-if="backupMessage" class="mt-2 text-xs text-center"
-          :class="backupMessage.includes('失败') ? 'text-red-500' : 'text-green-600'">
-          {{ backupMessage }}
-        </p>
-        <p class="mt-2 text-xs text-gray-400 leading-relaxed">
-          备份包含书籍内容、阅读进度和书签。iOS Safari 建议定期备份。
-        </p>
-      </div>
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/bookmarks')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 4h10v16l-5-3-5 3V4z" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">书签</span>
+            <span class="block mt-2 text-sm text-gray-400">所有书签</span>
+          </span>
+        </button>
+
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/records')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" stroke-width="1.8" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 7v5l3 2" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">阅读记录</span>
+            <span class="block mt-2 text-sm text-gray-400">阅读时间记录</span>
+          </span>
+        </button>
+
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/files')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">文件管理</span>
+            <span class="block mt-2 text-sm text-gray-400">管理私有文件夹的文件</span>
+          </span>
+        </button>
+
+        <button class="w-full flex items-center gap-4 py-4 text-left" @click="open('/settings/about')">
+          <span class="w-8 h-8 flex items-center justify-center text-gray-900">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" stroke-width="1.8" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6M12 7h.01" />
+            </svg>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-base leading-none">关于</span>
+          </span>
+        </button>
+      </section>
     </div>
   </div>
 </template>
+
+<style scoped>
+.settings-home {
+  background: var(--settings-page-bg);
+  color: var(--settings-text);
+}
+
+.settings-home > :first-child {
+  background: var(--settings-header-bg);
+  border-color: var(--settings-border);
+}
+
+.settings-home :deep(.bg-white) {
+  background: var(--settings-surface-bg) !important;
+}
+
+.settings-home :deep(.bg-gray-200) {
+  background: var(--settings-surface-muted) !important;
+}
+
+.settings-home :deep(.border-gray-100) {
+  border-color: var(--settings-border) !important;
+}
+
+.settings-home :deep(.text-gray-900),
+.settings-home :deep(.text-gray-700) {
+  color: var(--settings-text) !important;
+}
+
+.settings-home :deep(.text-gray-600),
+.settings-home :deep(.text-gray-500) {
+  color: var(--settings-text-secondary) !important;
+}
+
+.settings-home :deep(.text-gray-400) {
+  color: var(--settings-text-muted) !important;
+}
+</style>

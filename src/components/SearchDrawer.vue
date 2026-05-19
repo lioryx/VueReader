@@ -66,11 +66,15 @@ const inputBgClass = computed(() =>
 )
 
 const itemHoverClass = computed(() =>
-  settings.isDark ? 'active:bg-gray-800' : 'active:bg-gray-50',
+  settings.isEink
+    ? (settings.isDark ? 'active:bg-stone-900/60' : 'active:bg-stone-900/5')
+    : (settings.isDark ? 'active:bg-gray-800' : 'active:bg-gray-50'),
 )
 
 const markClass = computed(() =>
-  settings.isDark ? 'bg-indigo-500/40 text-indigo-200' : 'bg-yellow-200 text-gray-900',
+  settings.isEink
+    ? (settings.isDark ? 'bg-stone-100/15 text-stone-100' : 'bg-stone-900/12 text-stone-900')
+    : (settings.isDark ? 'bg-indigo-500/40 text-indigo-200' : 'bg-yellow-200 text-gray-900'),
 )
 </script>
 

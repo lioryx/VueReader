@@ -3,10 +3,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { db } from '@/db'
 import { useBookStore } from '@/stores/useBookStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import BookCard from '@/components/BookCard.vue'
 
 const router = useRouter()
 const bookStore = useBookStore()
+const settings = useSettingsStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const progressMap = ref<Record<number, { percent: number; totalSeconds: number }>>({})
 const dragging = ref(false)
@@ -30,6 +32,60 @@ async function installApp() {
 const sortMode = ref<'date' | 'title' | 'progress'>('date')
 
 const sortLabels: Record<typeof sortMode.value, string> = { date: '最新', title: '书名', progress: '进度' }
+
+const viewStyle = computed(() => ({
+  backgroundColor: settings.appPalette.pageBg,
+  color: settings.appPalette.text,
+}))
+
+const navStyle = computed(() => ({
+  backgroundColor: settings.appPalette.headerBg,
+  borderColor: settings.appPalette.border,
+}))
+
+const sortButtonStyle = computed(() => ({
+  backgroundColor: settings.appPalette.surfaceMuted,
+  color: settings.appPalette.textSecondary,
+}))
+
+const settingsButtonStyle = computed(() => ({
+  color: settings.appPalette.primarySoftText,
+}))
+
+const installBannerStyle = computed(() => ({
+  backgroundColor: settings.appPalette.primaryBg,
+  color: settings.appPalette.primaryText,
+}))
+
+const installButtonStyle = computed(() => ({
+  backgroundColor: settings.appPalette.surfaceBg,
+  color: settings.appPalette.primarySoftText,
+}))
+
+const importErrorStyle = computed(() =>
+  settings.isEink
+    ? {
+        backgroundColor: settings.appPalette.primarySoftBg,
+        color: settings.appPalette.text,
+      }
+    : undefined,
+)
+
+const footerStyle = computed(() => ({
+  backgroundColor: settings.appPalette.headerBg,
+  borderColor: settings.appPalette.border,
+}))
+
+const importButtonStyle = computed(() => ({
+  backgroundColor: settings.appPalette.primaryBg,
+  color: settings.appPalette.primaryText,
+}))
+
+const dragStyle = computed(() =>
+  dragging.value
+    ? { boxShadow: `inset 0 0 0 2px ${settings.appPalette.primaryBg}` }
+    : undefined,
+)
 
 const sortedBooks = computed(() => {
   const books = [...bookStore.books]
@@ -109,34 +165,35 @@ async function onDrop(e: DragEvent) {
 
 <template>
   <div
-    class="h-screen flex flex-col bg-gray-50"
-    :class="dragging ? 'ring-2 ring-indigo-400 ring-inset' : ''"
+    class="h-screen flex flex-col"
+    :style="[viewStyle, dragStyle]"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
     <!-- Navbar -->
-    <div class="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
-      <h1 class="text-lg font-bold text-gray-900">书架</h1>
+    <div class="flex items-center justify-between px-4 py-3 border-b" :style="navStyle" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
+      <h1 class="text-lg font-bold">书架</h1>
       <div class="flex items-center gap-3">
         <button
-          class="text-xs text-gray-500 bg-gray-100 px-2.5 py-1.5 rounded-lg font-medium"
+          class="text-xs px-2.5 py-1.5 rounded-lg font-medium"
+          :style="sortButtonStyle"
           @click="cycleSortMode"
         >
           {{ sortLabels[sortMode] }}
         </button>
-        <button class="text-indigo-600 text-sm font-medium" @click="router.push('/settings')">设置</button>
+        <button class="text-sm font-medium" :style="settingsButtonStyle" @click="router.push('/settings')">设置</button>
       </div>
     </div>
 
     <!-- PWA install banner -->
     <Transition name="slide-down">
-      <div v-if="showInstallBanner" class="flex items-center gap-3 px-4 py-3 bg-indigo-600 text-white text-sm">
+      <div v-if="showInstallBanner" class="flex items-center gap-3 px-4 py-3 text-sm" :style="installBannerStyle">
         <div class="flex-1">
           <p class="font-medium">安装到主屏幕</p>
           <p class="text-xs opacity-80 mt-0.5">离线阅读，体验更佳</p>
         </div>
-        <button class="px-3 py-1.5 bg-white text-indigo-600 rounded-lg text-xs font-semibold" @click="installApp">安装</button>
+        <button class="px-3 py-1.5 rounded-lg text-xs font-semibold" :style="installButtonStyle" @click="installApp">安装</button>
         <button class="opacity-60" @click="showInstallBanner = false">✕</button>
       </div>
     </Transition>
@@ -144,18 +201,18 @@ async function onDrop(e: DragEvent) {
     <!-- Book list -->
     <div class="flex-1 overflow-y-auto pb-24">
       <!-- Error -->
-      <div v-if="bookStore.importError" class="mx-4 mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl">
+      <div v-if="bookStore.importError" class="mx-4 mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl" :style="importErrorStyle">
         {{ bookStore.importError }}
       </div>
 
       <!-- Importing indicator -->
-      <div v-if="bookStore.importing" class="flex items-center justify-center gap-3 py-6 text-gray-500">
+      <div v-if="bookStore.importing" class="flex items-center justify-center gap-3 py-6" :style="{ color: settings.appPalette.textSecondary }">
         <div class="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
         <span class="text-sm">正在导入，请稍候…</span>
       </div>
 
       <!-- Empty state -->
-      <div v-if="bookStore.books.length === 0 && !bookStore.importing" class="flex flex-col items-center justify-center mt-24 text-gray-400">
+      <div v-if="bookStore.books.length === 0 && !bookStore.importing" class="flex flex-col items-center justify-center mt-24" :style="{ color: settings.appPalette.textMuted }">
         <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
@@ -187,10 +244,11 @@ async function onDrop(e: DragEvent) {
     </div>
 
     <!-- Import button -->
-    <div class="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100">
+    <div class="fixed bottom-0 left-0 right-0 p-4 border-t" :style="footerStyle">
       <input ref="fileInput" type="file" accept=".txt" multiple class="hidden" @change="onFileChange" />
       <button
-        class="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold text-base active:bg-indigo-700 transition-colors disabled:opacity-60"
+        class="w-full py-3 rounded-xl font-semibold text-base transition-colors disabled:opacity-60"
+        :style="importButtonStyle"
         :disabled="bookStore.importing"
         @click="fileInput?.click()"
       >

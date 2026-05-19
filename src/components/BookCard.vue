@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Book } from '@/db'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 
 const props = defineProps<{
   book: Book
@@ -8,6 +10,40 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ delete: [id: number] }>()
+const settings = useSettingsStore()
+
+const cardStyle = computed(() => ({
+  backgroundColor: settings.appPalette.surfaceBg,
+  borderColor: settings.appPalette.border,
+  color: settings.appPalette.text,
+  boxShadow: settings.appPalette.shadow,
+}))
+
+const coverStyle = computed(() =>
+  settings.isEink
+    ? { background: `linear-gradient(135deg, ${settings.appPalette.primaryBg} 0%, ${settings.appPalette.textSecondary} 100%)`, color: settings.appPalette.primaryText }
+    : undefined,
+)
+
+const metaStyle = computed(() => ({
+  color: settings.appPalette.textSecondary,
+}))
+
+const progressTrackStyle = computed(() => ({
+  backgroundColor: settings.appPalette.surfaceMuted,
+}))
+
+const progressFillStyle = computed(() => ({
+  backgroundColor: settings.appPalette.primaryBg,
+}))
+
+const progressTextStyle = computed(() => ({
+  color: settings.appPalette.textMuted,
+}))
+
+const deleteStyle = computed(() => ({
+  color: settings.appPalette.textMuted,
+}))
 
 function onDelete() {
   if (props.book.id !== undefined) emit('delete', props.book.id)
@@ -28,32 +64,32 @@ function formatSize(bytes: number): string {
 </script>
 
 <template>
-  <div class="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
+  <div class="flex items-start gap-3 p-4 rounded-xl border" :style="cardStyle">
     <div
       class="w-12 h-16 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
-      style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+      :style="coverStyle ?? { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }"
     >
       TXT
     </div>
 
     <div class="flex-1 min-w-0">
-      <h3 class="font-semibold text-gray-800 truncate">{{ book.title }}</h3>
-      <p class="text-xs text-gray-500 mt-0.5">{{ book.chapterCount }} 章 · {{ formatSize(book.size) }} · {{ book.encoding }}</p>
+      <h3 class="font-semibold truncate">{{ book.title }}</h3>
+      <p class="text-xs mt-0.5" :style="metaStyle">{{ book.chapterCount }} 章 · {{ formatSize(book.size) }} · {{ book.encoding }}</p>
       <div v-if="progress !== undefined" class="mt-2">
-        <div class="h-1 bg-gray-100 rounded-full overflow-hidden">
+        <div class="h-1 rounded-full overflow-hidden" :style="progressTrackStyle">
           <div
-            class="h-full bg-indigo-500 rounded-full"
-            :style="{ width: `${Math.round(progress * 100)}%` }"
+            class="h-full rounded-full"
+            :style="[progressFillStyle, { width: `${Math.round(progress * 100)}%` }]"
           />
         </div>
-        <p class="text-xs text-gray-400 mt-0.5">
+        <p class="text-xs mt-0.5" :style="progressTextStyle">
           已读 {{ Math.round(progress * 100) }}%
           <span v-if="totalSeconds && totalSeconds >= 60"> · {{ formatReadTime(totalSeconds) }}</span>
         </p>
       </div>
     </div>
 
-    <button class="p-1.5 text-gray-300 hover:text-red-400 transition-colors" @click.stop="onDelete">
+    <button class="p-1.5 transition-colors" :style="deleteStyle" @click.stop="onDelete">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           stroke-linecap="round"

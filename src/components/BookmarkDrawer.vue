@@ -30,6 +30,12 @@ const handleClass = computed(() =>
   settings.isDark ? 'bg-gray-600' : 'bg-gray-300',
 )
 
+const addButtonClass = computed(() =>
+  settings.isEink
+    ? (settings.isDark ? 'text-stone-100 bg-stone-100/10 active:bg-stone-100/20' : 'text-stone-900 bg-stone-900/10 active:bg-stone-900/15')
+    : 'text-indigo-500 bg-indigo-500/10 active:bg-indigo-500/20',
+)
+
 function chapterTitle(index: number): string {
   return props.chapters[index]?.title ?? `第 ${index + 1} 章`
 }
@@ -57,7 +63,8 @@ function onDelete(id: number | undefined) {
             <h2 class="text-base font-semibold">书签</h2>
             <div class="flex items-center gap-3">
               <button
-                class="text-sm text-indigo-500 font-medium px-2 py-1 rounded-lg bg-indigo-500/10 active:bg-indigo-500/20 transition-colors"
+                class="text-sm font-medium px-2 py-1 rounded-lg transition-colors"
+                :class="addButtonClass"
                 @click="emit('add')">
                 + 添加书签
               </button>

@@ -5,8 +5,11 @@ import { useSwipe, useResizeObserver, useWakeLock } from '@vueuse/core'
 import { useReaderStore } from '@/stores/useReaderStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { paginateText, type PageConfig, type PageLine } from '@/utils/pagination'
+import ReaderBottomBar from '@/components/ReaderBottomBar.vue'
 import ChapterDrawer from '@/components/ChapterDrawer.vue'
 import BookmarkDrawer from '@/components/BookmarkDrawer.vue'
+import ReaderSettingsPanel from '@/components/ReaderSettingsPanel.vue'
+import ReaderTopBar from '@/components/ReaderTopBar.vue'
 import SearchDrawer from '@/components/SearchDrawer.vue'
 
 const route = useRoute()
@@ -19,12 +22,12 @@ const showUI = ref(true)
 const showChapterDrawer = ref(false)
 const showBookmarkDrawer = ref(false)
 const showSearch = ref(false)
+const showReaderSettings = ref(false)
 const toast = ref('')
 // contentEl: the full-screen scrollable/page container
 const contentEl = ref<HTMLElement | null>(null)
 // pageTextAreaEl: the flex-1 area inside page mode where text actually lives
 const pageTextAreaEl = ref<HTMLElement | null>(null)
-let hideTimer: ReturnType<typeof setTimeout> | undefined
 let swipeEnded = false
 
 // ── Page mode ─────────────────────────────────────────────────────────────────
@@ -58,7 +61,10 @@ const readingPercent = computed(() => {
 
 // ── Keyboard navigation ───────────────────────────────────────────────────────
 function onKeydown(e: KeyboardEvent) {
-  if (showChapterDrawer.value || showBookmarkDrawer.value || showSearch.value) return
+  if (showChapterDrawer.value || showBookmarkDrawer.value || showSearch.value || showReaderSettings.value) {
+    if (e.key === 'Escape' && showReaderSettings.value) showReaderSettings.value = false
+    return
+  }
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
     e.preventDefault(); nextPage()
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
@@ -74,13 +80,11 @@ onMounted(async () => {
   if (isNaN(bookId)) { void router.replace('/'); return }
   await reader.openBook(bookId)
   sessionStart = Date.now()
-  scheduleHide()
   nextTick(updatePageConfig)
   window.addEventListener('keydown', onKeydown)
 })
 
 onUnmounted(() => {
-  clearTimeout(hideTimer)
   stopTTS()
   window.removeEventListener('keydown', onKeydown)
   if (wakeLockActive.value) void releaseWakeLock()
@@ -169,18 +173,12 @@ useSwipe(contentEl, {
 })
 
 // ── UI toggle / tap zones ─────────────────────────────────────────────────────
-function scheduleHide() {
-  clearTimeout(hideTimer)
-  hideTimer = setTimeout(() => { showUI.value = false }, 3500)
-}
-
 function toggleUI() {
   showUI.value = !showUI.value
-  if (showUI.value) scheduleHide()
 }
 
 function onContentClick(e: MouseEvent) {
-  if (swipeEnded || showChapterDrawer.value || showBookmarkDrawer.value || showSearch.value) return
+  if (swipeEnded || showChapterDrawer.value || showBookmarkDrawer.value || showSearch.value || showReaderSettings.value) return
   const rect = contentEl.value?.getBoundingClientRect()
   if (!rect) return
   const x = e.clientX - rect.left
@@ -205,9 +203,79 @@ const bgStyle = computed(() =>
   ({ backgroundColor: settings.currentTheme.bg, color: settings.currentTheme.text }),
 )
 
-const overlayClass = computed(() =>
-  settings.isDark ? 'bg-black/70 text-white' : 'bg-black/50 text-white',
+const chromeStyle = computed(() =>
+  ({
+    backgroundColor: settings.uiPalette.chromeBg,
+    color: settings.uiPalette.chromeText,
+    borderColor: settings.uiPalette.chromeBorder,
+  }),
 )
+
+const pillStyle = computed(() =>
+  ({
+    backgroundColor: settings.uiPalette.pillBg,
+    color: settings.uiPalette.pillText,
+    borderColor: settings.uiPalette.pillBorder,
+  }),
+)
+
+const activeReadingStyle = computed(() =>
+  ({ backgroundColor: settings.uiPalette.accentSoft }),
+)
+
+const chapterDividerStyle = computed(() =>
+  ({ backgroundColor: settings.isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(17, 24, 39, 0.12)' }),
+)
+
+const nextChapterButtonStyle = computed(() =>
+  ({ backgroundColor: settings.uiPalette.accent, color: settings.uiPalette.accentText }),
+)
+
+const ttsPulseStyle = computed(() =>
+  ({ backgroundColor: settings.uiPalette.accent }),
+)
+
+const wakeLockActiveStyle = computed(() =>
+  ({ color: settings.uiPalette.accent, backgroundColor: settings.uiPalette.accentSoft }),
+)
+
+const progressBarStyle = computed(() =>
+  ({ backgroundColor: settings.uiPalette.accent }),
+)
+
+const pageSliderValue = computed(() =>
+  settings.pageMode === 'page' ? pageIndex.value : 0,
+)
+
+const pageSliderMax = computed(() =>
+  settings.pageMode === 'page' ? Math.max(pages.value.length - 1, 0) : 0,
+)
+
+function onPageSliderInput(e: Event) {
+  if (settings.pageMode !== 'page') return
+  const nextIndex = Number((e.target as HTMLInputElement).value)
+  if (Number.isNaN(nextIndex) || nextIndex === pageIndex.value) return
+  pageIndex.value = Math.min(Math.max(nextIndex, 0), pageSliderMax.value)
+  void reader.saveProgress()
+}
+
+function nextChapterFromBar() {
+  if (reader.chapterIndex >= reader.chapters.length - 1) return
+  resetToChapter(reader.chapterIndex + 1)
+}
+
+function prevChapterFromBar() {
+  if (reader.chapterIndex <= 0) return
+  resetToChapter(reader.chapterIndex - 1)
+}
+
+function openReaderSettings() {
+  showReaderSettings.value = true
+}
+
+function closeReaderSettings() {
+  showReaderSettings.value = false
+}
 
 // ── Wake lock ─────────────────────────────────────────────────────────────────
 async function toggleWakeLock() {
@@ -302,23 +370,26 @@ function stopTTS() {
       :class="settings.pageMode === 'page' ? 'select-none' : 'overflow-y-auto'" @click="onContentClick">
       <!-- Scroll mode -->
       <template v-if="settings.pageMode === 'scroll'">
-        <div class="max-w-2xl mx-auto px-5 pb-6" style="padding-top: calc(env(safe-area-inset-top) + 4rem)">
+        <div class="max-w-2xl mx-auto px-5 pb-40" style="padding-top: calc(env(safe-area-inset-top) + 5.5rem)">
           <h2 v-if="reader.currentChapter" class="text-center text-sm font-semibold mb-6 opacity-50">
             {{ reader.currentChapter.title }}
           </h2>
           <p v-for="(para, i) in displayParas" :key="i" class="mb-4 rounded transition-colors duration-300"
-            :class="speaking && ttsParaIdx === i ? (settings.isDark ? 'bg-indigo-900/40' : 'bg-indigo-50') : ''"
-            :style="{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em', fontFamily: fontFamilyStyle }">
+            :style="[
+              { fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em', fontFamily: fontFamilyStyle },
+              speaking && ttsParaIdx === i ? activeReadingStyle : undefined,
+            ]">
             {{ para }}
           </p>
           <div v-if="displayParas.length === 0" class="flex justify-center items-center h-32 opacity-40 text-sm">暂无内容
           </div>
           <!-- End of chapter navigation -->
           <div class="py-10 flex flex-col items-center gap-4">
-            <div class="w-16 h-px" :class="settings.isDark ? 'bg-gray-700' : 'bg-gray-200'" />
+            <div class="w-16 h-px" :style="chapterDividerStyle" />
             <p class="text-xs opacity-40">本章完</p>
             <button v-if="reader.chapterIndex < reader.chapters.length - 1"
-              class="px-7 py-2.5 bg-indigo-600 text-white rounded-full text-sm font-medium active:bg-indigo-700 transition-colors"
+              class="px-7 py-2.5 rounded-full text-sm font-medium transition-colors"
+              :style="nextChapterButtonStyle"
               @click="nextPage()">
               下一章 →
             </button>
@@ -344,8 +415,10 @@ function stopTTS() {
                 </h2>
                 <div class="flex-1 overflow-hidden">
                   <div v-for="(line, i) in currentPageLines" :key="i" class="rounded transition-colors duration-300"
-                    :class="speaking && ttsParaIdx === line.paraIndex ? (settings.isDark ? 'bg-indigo-900/40' : 'bg-indigo-50') : ''"
-                    :style="{ fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: line.isParaStart ? '2em' : '0', marginBottom: line.isParaEnd ? '12px' : '0', fontFamily: fontFamilyStyle }">
+                    :style="[
+                      { fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: line.isParaStart ? '2em' : '0', marginBottom: line.isParaEnd ? '12px' : '0', fontFamily: fontFamilyStyle },
+                      speaking && ttsParaIdx === line.paraIndex ? activeReadingStyle : undefined,
+                    ]">
                     {{ line.text }}
                   </div>
                   <div v-if="currentPageLines.length === 0"
@@ -363,99 +436,54 @@ function stopTTS() {
       </template>
     </div>
 
-    <!-- ── Top overlay: progress bar + top bar + TTS bar stacked ──────────── -->
-    <div class="absolute top-0 inset-x-0 z-20 flex flex-col pointer-events-none" style="padding-top: env(safe-area-inset-top)">
-      <!-- Progress bar: always visible -->
-      <div class="h-0.5 w-full opacity-30 flex-shrink-0">
-        <div class="h-full bg-indigo-500 transition-[width] duration-500"
-          :style="{ width: `${readingPercent * 100}%` }" />
-      </div>
-      <!-- Top bar -->
-      <Transition name="fade">
-        <div v-if="showUI" class="pointer-events-auto flex items-center gap-2 px-4 py-3 backdrop-blur-sm"
-          :class="overlayClass">
-          <button class="p-1 -ml-1" @click="router.back()">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold truncate">{{ reader.book?.title }}</p>
-            <p v-if="reader.currentChapter" class="text-xs opacity-70 truncate">{{ reader.currentChapter.title }}</p>
-          </div>
-          <button class="p-1 opacity-80" @click.stop="showSearch = true">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" />
-            </svg>
-          </button>
-          <button v-if="wakeLockSupported" class="p-1.5 rounded-lg transition-colors"
-            :class="wakeLockActive ? 'bg-yellow-400/30 text-yellow-300' : 'opacity-70'" @click.stop="toggleWakeLock">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd"
-                d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
-                clip-rule="evenodd" />
-            </svg>
-          </button>
-          <button class="p-1 opacity-70" @click.stop="router.push('/settings')">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
-      </Transition>
-      <!-- TTS active bar: stacks directly below top bar (or at top when bar hidden) -->
-      <Transition name="fade">
-        <div v-if="speaking"
-          class="pointer-events-auto flex items-center gap-3 px-4 py-2 bg-indigo-600 text-white text-sm">
-          <div class="flex-1 flex items-center gap-2">
-            <div class="flex gap-0.5">
-              <span v-for="i in 3" :key="i" class="w-0.5 rounded-full bg-white/80 animate-pulse"
-                :style="{ height: '12px', animationDelay: `${i * 0.15}s` }" />
-            </div>
-            <span class="text-xs">朗读中{{ ttsPaused ? '（已暂停）' : '' }}</span>
-          </div>
-          <button class="px-3 py-1 bg-white/20 rounded-lg text-xs" @click="toggleTTS">
-            {{ ttsPaused ? '继续' : '暂停' }}
-          </button>
-          <button class="px-3 py-1 bg-white/20 rounded-lg text-xs" @click="stopTTS">停止</button>
-        </div>
-      </Transition>
-    </div>
-
-    <!-- ── Bottom bar ──────────────────────────────────────────────────────── -->
+    <!-- ── Reader chrome ──────────────────────────────────────────────────── -->
     <Transition name="fade">
-      <div v-if="showUI" class="absolute bottom-0 inset-x-0 z-20 flex items-center gap-1 px-3 py-3 backdrop-blur-sm"
-        :class="overlayClass">
-        <button
-          class="flex-1 py-2 rounded-lg bg-white/20 text-xs disabled:opacity-40 active:bg-white/30 transition-colors"
-          :disabled="reader.chapterIndex === 0 && pageIndex === 0" @click.stop="prevPage">
-          上一{{ settings.pageMode === 'page' ? '页' : '章' }}
-        </button>
-        <button class="flex-1 py-2 rounded-lg bg-white/20 text-xs active:bg-white/30 transition-colors"
-          @click.stop="showChapterDrawer = true">目录</button>
-        <button class="flex-1 py-2 rounded-lg text-xs transition-colors"
-          :class="speaking ? 'bg-indigo-500/60' : 'bg-white/20 active:bg-white/30'" @click.stop="toggleTTS">
-          <span class="flex items-center justify-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd"
-                d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z"
-                clip-rule="evenodd" />
-            </svg>
-            朗读
-          </span>
-        </button>
-        <button class="flex-1 py-2 rounded-lg bg-white/20 text-xs active:bg-white/30 transition-colors"
-          @click.stop="showBookmarkDrawer = true">书签</button>
-        <button
-          class="flex-1 py-2 rounded-lg bg-white/20 text-xs disabled:opacity-40 active:bg-white/30 transition-colors"
-          :disabled="reader.chapterIndex >= reader.chapters.length - 1 && (settings.pageMode !== 'page' || pageIndex >= pages.length - 1)"
-          @click.stop="nextPage">
-          下一{{ settings.pageMode === 'page' ? '页' : '章' }}
-        </button>
+      <div v-if="showUI" class="absolute inset-0 z-20 pointer-events-none" style="padding-top: env(safe-area-inset-top)">
+        <ReaderTopBar
+          :chrome-style="chromeStyle"
+          :book-title="reader.book?.title"
+          :chapter-title="reader.currentChapter?.title"
+          :chapter-index="reader.chapterIndex"
+          :reading-percent="readingPercent"
+          :wake-lock-supported="wakeLockSupported"
+          :wake-lock-active="wakeLockActive"
+          :wake-lock-active-style="wakeLockActiveStyle"
+          :progress-style="progressBarStyle"
+          @back="router.back()"
+          @search="showSearch = true"
+          @toggle-wake-lock="toggleWakeLock"
+        />
+
+        <Transition name="fade">
+          <div v-if="speaking"
+            class="pointer-events-auto mx-4 mt-3 flex items-center gap-3 rounded-full border px-4 py-2 text-sm shadow-md backdrop-blur-xl"
+            :style="pillStyle">
+            <div class="flex gap-0.5">
+              <span v-for="i in 3" :key="i" class="w-0.5 rounded-full bg-indigo-500 animate-pulse"
+                :style="[ttsPulseStyle, { height: '12px', animationDelay: `${i * 0.15}s` }]" />
+            </div>
+            <span class="flex-1 text-xs">朗读中{{ ttsPaused ? '（已暂停）' : '' }}</span>
+            <button class="text-xs font-medium opacity-80" @click="toggleTTS">{{ ttsPaused ? '继续' : '暂停' }}</button>
+            <button class="text-xs font-medium opacity-50" @click="stopTTS">停止</button>
+          </div>
+        </Transition>
+
+        <ReaderBottomBar
+          :chrome-style="chromeStyle"
+          :page-mode="settings.pageMode"
+          :page-slider-value="pageSliderValue"
+          :page-slider-max="pageSliderMax"
+          :can-go-prev="reader.chapterIndex > 0"
+          :can-go-next="reader.chapterIndex < reader.chapters.length - 1"
+          :slider-disabled="settings.pageMode !== 'page' || pages.length <= 1"
+          @prev="prevChapterFromBar"
+          @next="nextChapterFromBar"
+          @slider-input="onPageSliderInput"
+          @open-chapter-drawer="showChapterDrawer = true"
+          @toggle-t-t-s="toggleTTS"
+          @open-reader-settings="openReaderSettings"
+          @open-settings-page="router.push('/settings')"
+        />
       </div>
     </Transition>
 
@@ -476,6 +504,8 @@ function stopTTS() {
 
     <SearchDrawer :opened="showSearch" :chapters="reader.chapters" :full-text="reader.fullText"
       @close="showSearch = false" @select="(i) => { resetToChapter(i); showSearch = false }" />
+
+    <ReaderSettingsPanel :opened="showReaderSettings" @close="closeReaderSettings" />
   </div>
 </template>
 
@@ -516,4 +546,5 @@ function stopTTS() {
   transform: translateX(40%);
   opacity: 0;
 }
+
 </style>

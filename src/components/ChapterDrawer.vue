@@ -39,7 +39,9 @@ const inputBgClass = computed(() =>
 )
 
 const activeItemClass = computed(() =>
-  settings.isDark ? 'text-indigo-300 font-medium bg-indigo-500/20' : 'text-indigo-600 font-medium bg-indigo-50',
+  settings.isEink
+    ? (settings.isDark ? 'text-stone-100 font-medium bg-stone-100/10' : 'text-stone-900 font-medium bg-stone-900/10')
+    : (settings.isDark ? 'text-indigo-300 font-medium bg-indigo-500/20' : 'text-indigo-600 font-medium bg-indigo-50'),
 )
 
 const itemClass = computed(() =>
