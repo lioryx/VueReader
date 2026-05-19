@@ -208,7 +208,7 @@ function buildAppPalette(theme: CustomTheme, einkMode: boolean): AppUiPalette {
           primarySoftText: '#f4efe6',
           inputBg: '#2c2924',
           inputBorder: 'rgba(212, 204, 190, 0.16)',
-          shadow: '0 6px 18px rgba(0, 0, 0, 0.18)',
+          shadow: 'none',
         }
       : {
           pageBg: '#f3efe3',
@@ -225,7 +225,7 @@ function buildAppPalette(theme: CustomTheme, einkMode: boolean): AppUiPalette {
           primarySoftText: '#2f2b24',
           inputBg: '#f1ebdd',
           inputBorder: 'rgba(88, 80, 67, 0.16)',
-          shadow: '0 6px 16px rgba(58, 51, 39, 0.08)',
+          shadow: 'none',
         }
   }
 

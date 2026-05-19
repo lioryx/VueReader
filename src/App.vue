@@ -23,6 +23,10 @@ body[data-eink-mode] * {
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-eink-mode] *::before,
@@ -31,5 +35,9 @@ body[data-eink-mode] *::before,
 body[data-eink-mode] *::after {
   animation: none !important;
   transition: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 </style>
