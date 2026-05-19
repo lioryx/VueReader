@@ -201,17 +201,8 @@ const fontFamilyStyle = computed(() => {
   return "system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans GB', sans-serif"
 })
 
-const bgClass = computed(() => {
-  if (settings.activeCustomTheme) return ''
-  if (settings.isDark) return 'bg-gray-900 text-gray-100'
-  if (settings.theme === 'sepia') return 'bg-green-50 text-gray-800'
-  return 'bg-white text-gray-800'
-})
-
 const bgStyle = computed(() =>
-  settings.activeCustomTheme
-    ? { backgroundColor: settings.activeCustomTheme.bg, color: settings.activeCustomTheme.text }
-    : {},
+  ({ backgroundColor: settings.currentTheme.bg, color: settings.currentTheme.text }),
 )
 
 const overlayClass = computed(() =>
@@ -304,7 +295,7 @@ function stopTTS() {
 
 <template>
   <!-- Outer: relative so absolute children are positioned against the viewport -->
-  <div class="relative h-screen overflow-hidden" :class="bgClass" :style="bgStyle">
+  <div class="relative h-screen overflow-hidden" :style="bgStyle">
 
     <!-- ── Content: fills the full screen ─────────────────────────────────── -->
     <div ref="contentEl" class="absolute inset-0"

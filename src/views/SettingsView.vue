@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSettingsStore } from '@/stores/useSettingsStore'
+import { presetThemes, useSettingsStore } from '@/stores/useSettingsStore'
 import { db, type Book, type BookContent, type Chapter, type Progress, type Bookmark } from '@/db'
 
 const router = useRouter()
 const settings = useSettingsStore()
 
-const themes = [
-  { value: 'light', label: '日间' },
-  { value: 'dark', label: '夜间' },
-  { value: 'sepia', label: '护眼' },
-]
+const themes = presetThemes
 
 const showAddTheme = ref(false)
 const newTheme = ref({ label: '', bg: '#e8f5e9', text: '#1b5e20' })
+
+const themePreviewStyle = computed(() => ({
+  backgroundColor: settings.currentTheme.bg,
+  color: settings.currentTheme.text,
+  borderColor: settings.isDark ? '#374151' : '#d1d5db',
+  fontSize: `${settings.fontSize}px`,
+  lineHeight: String(settings.lineHeight),
+}))
 
 function perceivedLuminance(hex: string): number {
   const r = parseInt(hex.slice(1, 3), 16) / 255
@@ -273,10 +277,12 @@ async function importBackup(file: File) {
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">阅读主题</p>
         <div class="flex flex-wrap gap-2">
           <!-- Built-in themes -->
-          <button v-for="t in themes" :key="t.value"
-            class="py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all"
-            :class="settings.theme === t.value ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'"
-            @click="settings.theme = t.value">
+          <button v-for="t in themes" :key="t.id"
+            class="py-2 px-3 rounded-lg text-sm font-medium border-2 transition-all flex items-center gap-1.5"
+            :class="settings.theme === t.id ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-200 text-gray-600 bg-gray-50 active:bg-gray-100'"
+            @click="settings.theme = t.id">
+            <span class="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+              :style="{ backgroundColor: t.bg }" />
             {{ t.label }}
           </button>
           <!-- Custom themes -->
@@ -327,13 +333,7 @@ async function importBackup(file: File) {
         </div>
 
         <!-- Theme preview -->
-        <div class="mt-3 rounded-lg p-3 text-sm border transition-colors" :class="!settings.activeCustomTheme && {
-          'bg-white text-gray-800 border-gray-200': settings.theme === 'light',
-          'bg-gray-900 text-gray-100 border-gray-700': settings.theme === 'dark',
-          'bg-green-50 text-gray-800 border-green-200': settings.theme === 'sepia',
-        }" :style="settings.activeCustomTheme
-            ? { backgroundColor: settings.activeCustomTheme.bg, color: settings.activeCustomTheme.text, fontSize: `${settings.fontSize}px`, lineHeight: String(settings.lineHeight) }
-            : { fontSize: `${settings.fontSize}px`, lineHeight: String(settings.lineHeight) }">
+        <div class="mt-3 rounded-lg p-3 text-sm border transition-colors" :style="themePreviewStyle">
           预览：在静读中享受阅读的乐趣，文字的海洋等你来探索。
         </div>
       </div>

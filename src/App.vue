@@ -5,17 +5,7 @@ import { useSettingsStore } from '@/stores/useSettingsStore'
 const settings = useSettingsStore()
 
 watchEffect(() => {
-  let color: string
-  if (settings.activeCustomTheme) {
-    color = settings.activeCustomTheme.bg
-  } else if (settings.isDark) {
-    color = '#111827' // gray-900
-  } else if (settings.theme === 'sepia') {
-    color = '#f0fdf4' // green-50
-  } else {
-    color = '#ffffff'
-  }
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color)
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', settings.currentTheme.bg)
 })
 </script>
 

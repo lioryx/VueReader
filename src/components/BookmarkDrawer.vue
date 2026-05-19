@@ -18,17 +18,8 @@ const emit = defineEmits<{
 
 const settings = useSettingsStore()
 
-const sheetClass = computed(() => {
-  if (settings.activeCustomTheme) return ''
-  if (settings.isDark) return 'bg-gray-900 text-gray-100'
-  if (settings.theme === 'sepia') return 'bg-green-50 text-gray-800'
-  return 'bg-white text-gray-800'
-})
-
 const sheetStyle = computed(() =>
-  settings.activeCustomTheme
-    ? { backgroundColor: settings.activeCustomTheme.bg, color: settings.activeCustomTheme.text }
-    : {},
+  ({ backgroundColor: settings.currentTheme.bg, color: settings.currentTheme.text }),
 )
 
 const borderClass = computed(() =>
@@ -58,8 +49,7 @@ function onDelete(id: number | undefined) {
     <Transition name="sheet">
       <div v-if="opened" class="fixed inset-0 z-50 flex flex-col justify-end">
         <div class="absolute inset-0 bg-black/50" @click="emit('close')" />
-        <div class="sheet-content relative rounded-t-2xl max-h-[70vh] flex flex-col z-10" :class="sheetClass"
-          :style="sheetStyle">
+        <div class="sheet-content relative rounded-t-2xl max-h-[70vh] flex flex-col z-10" :style="sheetStyle">
           <div class="flex justify-center pt-3 pb-1">
             <div class="w-8 h-1 rounded-full" :class="handleClass" />
           </div>

@@ -53,17 +53,8 @@ const results = computed<SearchResult[]>(() => {
   return found
 })
 
-const bgClass = computed(() => {
-  if (settings.activeCustomTheme) return ''
-  if (settings.isDark) return 'bg-gray-900 text-gray-100'
-  if (settings.theme === 'sepia') return 'bg-green-50 text-gray-800'
-  return 'bg-white text-gray-800'
-})
-
 const bgStyle = computed(() =>
-  settings.activeCustomTheme
-    ? { backgroundColor: settings.activeCustomTheme.bg, color: settings.activeCustomTheme.text }
-    : {},
+  ({ backgroundColor: settings.currentTheme.bg, color: settings.currentTheme.text }),
 )
 
 const borderClass = computed(() =>
@@ -86,7 +77,7 @@ const markClass = computed(() =>
 <template>
   <Teleport to="body">
     <Transition name="search-slide">
-      <div v-if="opened" class="fixed inset-0 z-50 flex flex-col" :class="bgClass" :style="bgStyle">
+      <div v-if="opened" class="fixed inset-0 z-50 flex flex-col" :style="bgStyle">
         <!-- Header -->
         <div class="flex items-center gap-3 px-4 py-3 border-b" :class="borderClass">
           <button class="p-1 -ml-1 opacity-70" @click="emit('close')">
