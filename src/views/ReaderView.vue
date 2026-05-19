@@ -34,6 +34,9 @@ let swipeEnded = false
 const pageIndex = ref(0)
 const pageConfig = ref<PageConfig | null>(null)
 const pageTransition = ref('slide-left')
+const now = ref(new Date())
+const contentTopInset = '3.5rem'
+const contentBottomInset = '3rem'
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 const speaking = ref(false)
@@ -41,6 +44,7 @@ const ttsPaused = ref(false)
 const ttsParaIdx = ref(-1)
 const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 let ttsActive = false
+let clockTimer: number | undefined
 
 // ── Wake lock ─────────────────────────────────────────────────────────────────
 const { isSupported: wakeLockSupported, isActive: wakeLockActive, request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
@@ -80,12 +84,16 @@ onMounted(async () => {
   if (isNaN(bookId)) { void router.replace('/'); return }
   await reader.openBook(bookId)
   sessionStart = Date.now()
+  clockTimer = window.setInterval(() => {
+    now.value = new Date()
+  }, 30000)
   nextTick(updatePageConfig)
   window.addEventListener('keydown', onKeydown)
 })
 
 onUnmounted(() => {
   stopTTS()
+  if (clockTimer !== undefined) window.clearInterval(clockTimer)
   window.removeEventListener('keydown', onKeydown)
   if (wakeLockActive.value) void releaseWakeLock()
   const secs = Math.floor((Date.now() - sessionStart) / 1000)
@@ -101,7 +109,7 @@ function updatePageConfig() {
   if (!width || !height) return
   pageConfig.value = {
     visibleWidth: width - 40,   // px-5 padding (20px each side)
-    visibleHeight: height - 40, // pt-3 (12px) + h2 title (~28px)
+    visibleHeight: height - 12, // content inner top padding only
     fontSize: settings.fontSize,
     lineHeight: settings.lineHeight,
     indentChars: 2,
@@ -203,6 +211,19 @@ const bgStyle = computed(() =>
   ({ backgroundColor: settings.currentTheme.bg, color: settings.currentTheme.text }),
 )
 
+function hexToRgba(hex: string, alpha: number) {
+  const normalized = hex.replace('#', '')
+  const safeHex = normalized.length === 6 ? normalized : '000000'
+  const r = parseInt(safeHex.slice(0, 2), 16)
+  const g = parseInt(safeHex.slice(2, 4), 16)
+  const b = parseInt(safeHex.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+const infoBarStyle = computed(() => ({
+  color: hexToRgba(settings.currentTheme.text, settings.isEink ? 0.62 : 0.42),
+}))
+
 const chromeStyle = computed(() =>
   ({
     backgroundColor: settings.uiPalette.chromeBg,
@@ -250,6 +271,20 @@ const pageSliderValue = computed(() =>
 const pageSliderMax = computed(() =>
   settings.pageMode === 'page' ? Math.max(pages.value.length - 1, 0) : 0,
 )
+
+const pageInfoCurrent = computed(() =>
+  settings.pageMode === 'page' ? pageIndex.value + 1 : 1,
+)
+
+const pageInfoTotal = computed(() =>
+  settings.pageMode === 'page' ? Math.max(pages.value.length, 1) : 1,
+)
+
+const currentTime = computed(() => {
+  const hours = String(now.value.getHours()).padStart(2, '0')
+  const minutes = String(now.value.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+})
 
 function onPageSliderInput(e: Event) {
   if (settings.pageMode !== 'page') return
@@ -370,10 +405,8 @@ function stopTTS() {
       :class="settings.pageMode === 'page' ? 'select-none' : 'overflow-y-auto'" @click="onContentClick">
       <!-- Scroll mode -->
       <template v-if="settings.pageMode === 'scroll'">
-        <div class="max-w-2xl mx-auto px-5 pb-40" style="padding-top: calc(env(safe-area-inset-top) + 5.5rem)">
-          <h2 v-if="reader.currentChapter" class="text-center text-sm font-semibold mb-6 opacity-50">
-            {{ reader.currentChapter.title }}
-          </h2>
+        <div class="max-w-2xl mx-auto px-5 pb-40"
+          :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(env(safe-area-inset-bottom) + ${contentBottomInset} + 6rem)` }">
           <p v-for="(para, i) in displayParas" :key="i" class="mb-4 rounded transition-colors duration-300"
             :style="[
               { fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em', fontFamily: fontFamilyStyle },
@@ -403,16 +436,13 @@ function stopTTS() {
       <!-- pt/pb reserve fixed space matching the floating bar heights so
            pagination is computed against the same area regardless of bar state -->
       <template v-else>
-        <div class="absolute inset-0 flex flex-col" style="padding-top: env(safe-area-inset-top)">
+        <div class="absolute inset-0 flex flex-col"
+          :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(env(safe-area-inset-bottom) + ${contentBottomInset})` }">
           <!-- pageTextAreaEl: measured by updateCharsPerPage -->
           <div ref="pageTextAreaEl" class="relative flex-1 overflow-hidden">
             <Transition :name="pageTransition">
               <div :key="`${reader.chapterIndex}-${pageIndex}`"
                 class="absolute inset-0 px-5 pt-3 overflow-hidden flex flex-col">
-                <h2 v-if="reader.currentChapter"
-                  class="text-center text-xs font-semibold mb-3 opacity-40 flex-shrink-0">
-                  {{ reader.currentChapter.title }}
-                </h2>
                 <div class="flex-1 overflow-hidden">
                   <div v-for="(line, i) in currentPageLines" :key="i" class="rounded transition-colors duration-300"
                     :style="[
@@ -427,16 +457,27 @@ function stopTTS() {
               </div>
             </Transition>
           </div>
-          <!-- Page indicator -->
-          <div class="flex-shrink-0 flex items-center justify-center gap-4 py-1.5 text-xs opacity-40">
-            <span>{{ reader.currentChapter?.title?.slice(0, 8) }}</span>
-            <span>{{ pageIndex + 1 }} / {{ pages.length }}</span>
-          </div>
         </div>
       </template>
     </div>
 
-    <!-- ── Reader chrome ──────────────────────────────────────────────────── -->
+    <div class="absolute inset-0 z-10 pointer-events-none" style="padding-top: env(safe-area-inset-top)">
+      <div class="px-5 pt-3" :style="infoBarStyle">
+        <div class="flex items-center justify-between gap-4 text-sm leading-none">
+          <p class="min-w-0 flex-1 truncate">{{ reader.book?.title || '未命名书籍' }}</p>
+          <p class="shrink-0 tabular-nums">{{ currentTime }}</p>
+        </div>
+      </div>
+
+      <div class="absolute bottom-0 inset-x-0 px-5 pb-4" style="padding-bottom: calc(env(safe-area-inset-bottom) + 1rem)" :style="infoBarStyle">
+        <div class="flex items-end justify-between gap-4 text-sm leading-none">
+          <p class="min-w-0 flex-1 truncate">{{ reader.currentChapter?.title || '暂无章节' }}</p>
+          <p class="shrink-0 tabular-nums">{{ pageInfoCurrent }} / {{ pageInfoTotal }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Reader transient chrome ──────────────────────────────────────── -->
     <Transition name="fade">
       <div v-if="showUI" class="absolute inset-0 z-20 pointer-events-none" style="padding-top: env(safe-area-inset-top)">
         <ReaderTopBar
