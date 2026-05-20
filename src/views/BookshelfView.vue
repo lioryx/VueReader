@@ -13,7 +13,10 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const progressMap = ref<Record<number, { percent: number; totalSeconds: number }>>({})
 const dragging = ref(false)
 const showInstallBanner = ref(false)
+const longPressDelay = 450
 let deferredInstallPrompt: Event & { prompt: () => void; userChoice: Promise<{ outcome: string }> } | null = null
+let longPressTimer: number | null = null
+let longPressTriggered = false
 
 function onBeforeInstallPrompt(e: Event) {
   e.preventDefault()
@@ -113,6 +116,10 @@ onMounted(async () => {
   await loadProgressMap()
 })
 
+onUnmounted(() => {
+  clearBookPress()
+})
+
 async function loadProgressMap() {
   const all = await db.progress.toArray()
   const map: Record<number, { percent: number; totalSeconds: number }> = {}
@@ -138,6 +145,38 @@ async function handleImportFiles(files: File[]) {
 function openBook(bookId: number | undefined) {
   if (bookId === undefined) return
   void router.push(`/reader/${bookId}`)
+}
+
+function openBookDetail(bookId: number | undefined) {
+  if (bookId === undefined) return
+  void router.push(`/books/${bookId}`)
+}
+
+function startBookPress(bookId: number | undefined) {
+  clearBookPress()
+  if (bookId === undefined) return
+  longPressTriggered = false
+  longPressTimer = window.setTimeout(() => {
+    longPressTriggered = true
+    openBookDetail(bookId)
+  }, longPressDelay)
+}
+
+function clearBookPress() {
+  if (longPressTimer !== null) {
+    window.clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+function finishBookPress(bookId: number | undefined) {
+  if (bookId === undefined) return
+  clearBookPress()
+  if (longPressTriggered) {
+    longPressTriggered = false
+    return
+  }
+  openBook(bookId)
 }
 
 async function deleteBook(bookId: number) {
@@ -231,7 +270,10 @@ async function onDrop(e: DragEvent) {
           v-for="book in sortedBooks"
           :key="book.id"
           class="cursor-pointer active:scale-[0.98] transition-transform"
-          @click="openBook(book.id)"
+          @pointerdown="startBookPress(book.id)"
+          @pointerup="finishBookPress(book.id)"
+          @pointerleave="clearBookPress"
+          @pointercancel="clearBookPress"
         >
           <BookCard
             :book="book"
