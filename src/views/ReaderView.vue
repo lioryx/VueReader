@@ -6,8 +6,6 @@ import { useReaderStore } from '@/stores/useReaderStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { paginateText, type PageConfig, type PageLine } from '@/utils/pagination'
 import ReaderBottomBar from '@/components/ReaderBottomBar.vue'
-import ChapterDrawer from '@/components/ChapterDrawer.vue'
-import BookmarkDrawer from '@/components/BookmarkDrawer.vue'
 import ReaderSettingsPanel from '@/components/ReaderSettingsPanel.vue'
 import ReaderTopBar from '@/components/ReaderTopBar.vue'
 import SearchDrawer from '@/components/SearchDrawer.vue'
@@ -19,8 +17,6 @@ const settings = useSettingsStore()
 
 // ── UI state ─────────────────────────────────────────────────────────────────
 const showUI = ref(true)
-const showChapterDrawer = ref(false)
-const showBookmarkDrawer = ref(false)
 const showSearch = ref(false)
 const showReaderSettings = ref(false)
 const toast = ref('')
@@ -65,7 +61,7 @@ const readingPercent = computed(() => {
 
 // ── Keyboard navigation ───────────────────────────────────────────────────────
 function onKeydown(e: KeyboardEvent) {
-  if (showChapterDrawer.value || showBookmarkDrawer.value || showSearch.value || showReaderSettings.value) {
+  if (showSearch.value || showReaderSettings.value) {
     if (e.key === 'Escape' && showReaderSettings.value) showReaderSettings.value = false
     return
   }
@@ -186,7 +182,7 @@ function toggleUI() {
 }
 
 function onContentClick(e: MouseEvent) {
-  if (swipeEnded || showChapterDrawer.value || showBookmarkDrawer.value || showSearch.value || showReaderSettings.value) return
+  if (swipeEnded || showSearch.value || showReaderSettings.value) return
   const rect = contentEl.value?.getBoundingClientRect()
   if (!rect) return
   const x = e.clientX - rect.left
@@ -324,8 +320,13 @@ async function onAddBookmark() {
   const input = window.prompt('书签备注（可选）', reader.currentChapter?.title ?? '')
   if (input === null) return
   await reader.addBookmark(input.trim() || undefined)
-  showBookmarkDrawer.value = false
   showToast('书签已添加')
+}
+
+function openCatalogPage() {
+  const bookId = reader.book?.id ?? Number(route.params['bookId'])
+  if (bookId === undefined || Number.isNaN(bookId)) return
+  void router.push(`/reader/${bookId}/catalog`)
 }
 
 // ── Navigation helpers ────────────────────────────────────────────────────────
@@ -520,7 +521,7 @@ function stopTTS() {
           @prev="prevChapterFromBar"
           @next="nextChapterFromBar"
           @slider-input="onPageSliderInput"
-          @open-chapter-drawer="showChapterDrawer = true"
+          @open-chapter-drawer="openCatalogPage"
           @toggle-t-t-s="toggleTTS"
           @open-reader-settings="openReaderSettings"
           @open-settings-page="router.push('/settings')"
@@ -535,13 +536,6 @@ function stopTTS() {
         {{ toast }}
       </div>
     </Transition>
-
-    <ChapterDrawer :opened="showChapterDrawer" :chapters="reader.chapters" :current-index="reader.chapterIndex"
-      @close="showChapterDrawer = false" @select="(i) => { resetToChapter(i); showChapterDrawer = false }" />
-
-    <BookmarkDrawer :opened="showBookmarkDrawer" :bookmarks="reader.bookmarks" :chapters="reader.chapters"
-      @close="showBookmarkDrawer = false" @add="onAddBookmark" @delete="reader.removeBookmark"
-      @jump="(i) => { resetToChapter(i); showBookmarkDrawer = false }" />
 
     <SearchDrawer :opened="showSearch" :chapters="reader.chapters" :full-text="reader.fullText"
       @close="showSearch = false" @select="(i) => { resetToChapter(i); showSearch = false }" />

@@ -22,6 +22,14 @@ export function parseChapters(text: string): ParsedChapter[] {
     offset += line.length + 1
   }
 
+  const first = chapters[0]
+  if (first !== undefined && first.offset > 0) {
+    const leadingText = text.slice(0, first.offset)
+    if (leadingText.trim().length > 0) {
+      chapters.unshift({ title: '前言', offset: 0, length: first.offset })
+    }
+  }
+
   const last = chapters[chapters.length - 1]
   if (last !== undefined) {
     last.length = text.length - last.offset

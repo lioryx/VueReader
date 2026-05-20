@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import BookshelfView from '@/views/BookshelfView.vue'
+import ReaderCatalogView from '@/views/ReaderCatalogView.vue'
 import ReaderView from '@/views/ReaderView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import AboutSettingsView from '@/views/settings/AboutSettingsView.vue'
@@ -17,6 +18,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: BookshelfView },
     { path: '/reader/:bookId', component: ReaderView },
+    { path: '/reader/:bookId/catalog', component: ReaderCatalogView },
     { path: '/settings', component: SettingsView },
     { path: '/settings/theme', component: ThemeSettingsView },
     { path: '/settings/other', component: OtherSettingsView },
