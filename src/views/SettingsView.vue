@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import BottomTabBar from '@/components/BottomTabBar.vue'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 
 const router = useRouter()
@@ -34,11 +35,6 @@ function open(path: string) {
   <div class="settings-home h-screen flex flex-col" :style="pageStyle">
     <div class="px-4 pb-4 pt-6 border-b" style="padding-top: calc(env(safe-area-inset-top) + 1rem)">
       <div class="flex items-center gap-3">
-        <button class="p-1 -ml-1 text-gray-600" @click="router.back()">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
         <h1 class="text-lg font-semibold">设置</h1>
       </div>
     </div>
@@ -182,6 +178,8 @@ function open(path: string) {
         </button>
       </section>
     </div>
+
+    <BottomTabBar active="settings" />
   </div>
 </template>
 

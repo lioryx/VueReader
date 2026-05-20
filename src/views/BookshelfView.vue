@@ -4,19 +4,22 @@ import { useRouter } from 'vue-router'
 import { db } from '@/db'
 import { useBookStore } from '@/stores/useBookStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
-import BookCard from '@/components/BookCard.vue'
+import BottomTabBar from '@/components/BottomTabBar.vue'
+import BookshelfBookList from '@/components/BookshelfBookList.vue'
+import BookshelfEmptyState from '@/components/BookshelfEmptyState.vue'
+import BookshelfHeader from '@/components/BookshelfHeader.vue'
+import BookshelfInstallBanner from '@/components/BookshelfInstallBanner.vue'
 
 const router = useRouter()
 const bookStore = useBookStore()
 const settings = useSettingsStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const progressMap = ref<Record<number, { percent: number; totalSeconds: number }>>({})
+const chapterMetaMap = ref<Record<number, { currentChapterTitle: string; lastChapterTitle: string; remainingChapters: number }>>({})
 const dragging = ref(false)
 const showInstallBanner = ref(false)
-const longPressDelay = 450
+const showMenu = ref(false)
 let deferredInstallPrompt: Event & { prompt: () => void; userChoice: Promise<{ outcome: string }> } | null = null
-let longPressTimer: number | null = null
-let longPressTriggered = false
 
 function onBeforeInstallPrompt(e: Event) {
   e.preventDefault()
@@ -41,30 +44,6 @@ const viewStyle = computed(() => ({
   color: settings.appPalette.text,
 }))
 
-const navStyle = computed(() => ({
-  backgroundColor: settings.appPalette.headerBg,
-  borderColor: settings.appPalette.border,
-}))
-
-const sortButtonStyle = computed(() => ({
-  backgroundColor: settings.appPalette.surfaceMuted,
-  color: settings.appPalette.textSecondary,
-}))
-
-const settingsButtonStyle = computed(() => ({
-  color: settings.appPalette.primarySoftText,
-}))
-
-const installBannerStyle = computed(() => ({
-  backgroundColor: settings.appPalette.primaryBg,
-  color: settings.appPalette.primaryText,
-}))
-
-const installButtonStyle = computed(() => ({
-  backgroundColor: settings.appPalette.surfaceBg,
-  color: settings.appPalette.primarySoftText,
-}))
-
 const importErrorStyle = computed(() =>
   settings.isEink
     ? {
@@ -73,16 +52,6 @@ const importErrorStyle = computed(() =>
       }
     : undefined,
 )
-
-const footerStyle = computed(() => ({
-  backgroundColor: settings.appPalette.headerBg,
-  borderColor: settings.appPalette.border,
-}))
-
-const importButtonStyle = computed(() => ({
-  backgroundColor: settings.appPalette.primaryBg,
-  color: settings.appPalette.primaryText,
-}))
 
 const dragStyle = computed(() =>
   dragging.value
@@ -104,27 +73,69 @@ const sortedBooks = computed(() => {
   return books
 })
 
-function cycleSortMode() {
-  const modes: Array<typeof sortMode.value> = ['date', 'title', 'progress']
-  const idx = modes.indexOf(sortMode.value)
-  sortMode.value = modes[(idx + 1) % modes.length] ?? 'date'
+function toggleMenu() {
+  showMenu.value = !showMenu.value
+}
+
+function closeMenu() {
+  showMenu.value = false
+}
+
+function applySort(mode: typeof sortMode.value) {
+  sortMode.value = mode
+  closeMenu()
+}
+
+function openImportPicker() {
+  closeMenu()
+  fileInput.value?.click()
 }
 
 onMounted(async () => {
   window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
   await bookStore.loadBooks()
-  await loadProgressMap()
+  await loadBookshelfMeta()
 })
 
 onUnmounted(() => {
-  clearBookPress()
+  closeMenu()
 })
 
-async function loadProgressMap() {
-  const all = await db.progress.toArray()
-  const map: Record<number, { percent: number; totalSeconds: number }> = {}
-  for (const p of all) map[p.bookId] = { percent: p.percent, totalSeconds: p.totalSeconds ?? 0 }
-  progressMap.value = map
+async function loadBookshelfMeta() {
+  const [allProgress, allChapters] = await Promise.all([db.progress.toArray(), db.chapters.toArray()])
+  const nextProgressMap: Record<number, { percent: number; totalSeconds: number }> = {}
+  const nextChapterMetaMap: Record<number, { currentChapterTitle: string; lastChapterTitle: string; remainingChapters: number }> = {}
+
+  const progressByBookId = new Map(allProgress.map((progress) => [progress.bookId, progress]))
+  const chaptersByBookId = new Map<number, typeof allChapters>()
+
+  for (const chapter of allChapters.sort((a, b) => a.bookId - b.bookId || a.index - b.index)) {
+    const chapters = chaptersByBookId.get(chapter.bookId) ?? []
+    chapters.push(chapter)
+    chaptersByBookId.set(chapter.bookId, chapters)
+  }
+
+  for (const book of bookStore.books) {
+    if (book.id === undefined) continue
+    const progress = progressByBookId.get(book.id)
+    const chapters = chaptersByBookId.get(book.id) ?? []
+    const currentIndex = Math.max(0, progress?.chapterIndex ?? 0)
+    const currentChapter = chapters[currentIndex]
+    const lastChapter = chapters.at(-1)
+
+    if (progress) {
+      nextProgressMap[book.id] = { percent: progress.percent, totalSeconds: progress.totalSeconds ?? 0 }
+    }
+
+    nextChapterMetaMap[book.id] = {
+      currentChapterTitle: currentChapter?.title ?? '暂无目录',
+      lastChapterTitle: lastChapter?.title ?? '暂无目录',
+      remainingChapters: Math.max(book.chapterCount - (progress ? progress.chapterIndex + 1 : 0), 0),
+    }
+  }
+
+  progressMap.value = nextProgressMap
+  chapterMetaMap.value = nextChapterMetaMap
 }
 
 function onFileChange(e: Event) {
@@ -139,50 +150,19 @@ async function handleImportFiles(files: File[]) {
   for (const file of txts) {
     await bookStore.importBook(file)
   }
-  await loadProgressMap()
+  await loadBookshelfMeta()
 }
 
 function openBook(bookId: number | undefined) {
   if (bookId === undefined) return
+  closeMenu()
   void router.push(`/reader/${bookId}`)
 }
 
 function openBookDetail(bookId: number | undefined) {
   if (bookId === undefined) return
+  closeMenu()
   void router.push(`/books/${bookId}`)
-}
-
-function startBookPress(bookId: number | undefined) {
-  clearBookPress()
-  if (bookId === undefined) return
-  longPressTriggered = false
-  longPressTimer = window.setTimeout(() => {
-    longPressTriggered = true
-    openBookDetail(bookId)
-  }, longPressDelay)
-}
-
-function clearBookPress() {
-  if (longPressTimer !== null) {
-    window.clearTimeout(longPressTimer)
-    longPressTimer = null
-  }
-}
-
-function finishBookPress(bookId: number | undefined) {
-  if (bookId === undefined) return
-  clearBookPress()
-  if (longPressTriggered) {
-    longPressTriggered = false
-    return
-  }
-  openBook(bookId)
-}
-
-async function deleteBook(bookId: number) {
-  if (!confirm('确定删除这本书吗？')) return
-  await bookStore.deleteBook(bookId)
-  delete progressMap.value[bookId]
 }
 
 function onDragOver(e: DragEvent) {
@@ -210,35 +190,24 @@ async function onDrop(e: DragEvent) {
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <!-- Navbar -->
-    <div class="flex items-center justify-between px-4 py-3 border-b" :style="navStyle" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
-      <h1 class="text-lg font-bold">书架</h1>
-      <div class="flex items-center gap-3">
-        <button
-          class="text-xs px-2.5 py-1.5 rounded-lg font-medium"
-          :style="sortButtonStyle"
-          @click="cycleSortMode"
-        >
-          {{ sortLabels[sortMode] }}
-        </button>
-        <button class="text-sm font-medium" :style="settingsButtonStyle" @click="router.push('/settings')">设置</button>
-      </div>
-    </div>
+    <BookshelfHeader
+      :show-menu="showMenu"
+      :sort-mode="sortMode"
+      :sort-labels="sortLabels"
+      @toggle-menu="toggleMenu"
+      @close-menu="closeMenu"
+      @apply-sort="applySort"
+      @open-import="openImportPicker"
+    />
 
-    <!-- PWA install banner -->
-    <Transition name="slide-down">
-      <div v-if="showInstallBanner" class="flex items-center gap-3 px-4 py-3 text-sm" :style="installBannerStyle">
-        <div class="flex-1">
-          <p class="font-medium">安装到主屏幕</p>
-          <p class="text-xs opacity-80 mt-0.5">离线阅读，体验更佳</p>
-        </div>
-        <button class="px-3 py-1.5 rounded-lg text-xs font-semibold" :style="installButtonStyle" @click="installApp">安装</button>
-        <button class="opacity-60" @click="showInstallBanner = false">✕</button>
-      </div>
-    </Transition>
+    <BookshelfInstallBanner
+      :visible="showInstallBanner"
+      @install="installApp"
+      @close="showInstallBanner = false"
+    />
 
     <!-- Book list -->
-    <div class="flex-1 overflow-y-auto pb-24">
+    <div class="flex-1 overflow-y-auto pb-2">
       <!-- Error -->
       <div v-if="bookStore.importError" class="mx-4 mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl" :style="importErrorStyle">
         {{ bookStore.importError }}
@@ -251,65 +220,19 @@ async function onDrop(e: DragEvent) {
       </div>
 
       <!-- Empty state -->
-      <div v-if="bookStore.books.length === 0 && !bookStore.importing" class="flex flex-col items-center justify-center mt-24" :style="{ color: settings.appPalette.textMuted }">
-        <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1"
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-        <p class="text-base font-medium">书架空空如也</p>
-        <p class="text-sm mt-1">点击下方按钮或拖入 TXT 文件</p>
-      </div>
+      <BookshelfEmptyState v-if="bookStore.books.length === 0 && !bookStore.importing" />
 
-      <!-- Books -->
-      <div class="p-4 space-y-3">
-        <div
-          v-for="book in sortedBooks"
-          :key="book.id"
-          class="cursor-pointer active:scale-[0.98] transition-transform"
-          @pointerdown="startBookPress(book.id)"
-          @pointerup="finishBookPress(book.id)"
-          @pointerleave="clearBookPress"
-          @pointercancel="clearBookPress"
-        >
-          <BookCard
-            :book="book"
-            :progress="book.id !== undefined ? progressMap[book.id]?.percent : undefined"
-            :total-seconds="book.id !== undefined ? progressMap[book.id]?.totalSeconds : undefined"
-            @delete="deleteBook"
-          />
-        </div>
-      </div>
+      <BookshelfBookList
+        :books="sortedBooks"
+        :chapter-meta-map="chapterMetaMap"
+        :progress-map="progressMap"
+        @open="openBook"
+        @open-detail="openBookDetail"
+      />
     </div>
 
-    <!-- Import button -->
-    <div class="fixed bottom-0 left-0 right-0 p-4 border-t" :style="footerStyle">
-      <input ref="fileInput" type="file" accept=".txt" multiple class="hidden" @change="onFileChange" />
-      <button
-        class="w-full py-3 rounded-xl font-semibold text-base transition-colors disabled:opacity-60"
-        :style="importButtonStyle"
-        :disabled="bookStore.importing"
-        @click="fileInput?.click()"
-      >
-        + 导入书籍
-      </button>
-    </div>
+    <BottomTabBar active="bookshelf" />
+
+    <input ref="fileInput" type="file" accept=".txt" multiple class="hidden" @change="onFileChange" />
   </div>
 </template>
-
-<style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: max-height 0.25s ease, opacity 0.25s ease;
-  overflow: hidden;
-  max-height: 80px;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  max-height: 0;
-  opacity: 0;
-}
-</style>
