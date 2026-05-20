@@ -1,5 +1,42 @@
 # txt reader
 
+## Project Snapshot
+
+- This is a Vue 3 + TypeScript + Vite PWA for local TXT novel reading, optimized for mobile/offline use. See [README.md](README.md) for the product overview and roadmap.
+- The app stores all user data locally in IndexedDB via Dexie; avoid introducing backend assumptions unless explicitly requested.
+- Vite uses `base: '/VueReader/'`; keep asset paths, router behavior, and GitHub Pages deployment compatibility in mind.
+
+## Commands Agents Should Run
+
+- Install: `pnpm install`
+- Dev server: `pnpm dev`
+- Production build and type check: `pnpm build`
+- Type check only: `pnpm type-check`
+- Lint with fixes: `pnpm lint`
+- Format source: `pnpm format`
+- Preview PWA build: `pnpm build && pnpm preview`
+
+Use Node `^20.19.0 || >=22.12.0`, matching [package.json](package.json). There is no test script currently; for behavior changes, verify with focused manual checks and at least `pnpm build`.
+
+## Source Boundaries
+
+- `src/views/` contains route-level screens. `ReaderView.vue` is the main reference for reader interaction, pagination, TTS, wake lock, and progress tracking.
+- `src/components/` contains reusable/presentational UI. Prefer props and emits for parent communication.
+- `src/stores/` contains Pinia composition stores. DB reads/writes and cross-table transactions belong here when tied to app state.
+- `src/db/index.ts` defines Dexie tables and types. Update schema, indexes, and affected store logic together.
+- `src/utils/` contains pure domain utilities such as encoding detection, chapter parsing, and pagination measurement.
+- `src/workers/parser.worker.ts` handles TXT decoding and chapter parsing off the main thread. Keep large-file parsing work out of UI components.
+- `src/router/index.ts` is route-only wiring using `createWebHistory(import.meta.env.BASE_URL)`.
+
+## Project-Specific Pitfalls
+
+- TXT parsing normalizes CRLF/CR to LF before chapter offsets are stored; preserve offset math when changing parser or reader slicing logic.
+- Chapter detection is tuned for Chinese novel headings and falls back to a single `全文` chapter.
+- Reading progress percent is based on full-book character offset, not just the current chapter.
+- Import and delete flows touch multiple IndexedDB tables; keep related writes in Dexie transactions.
+- Reader pagination depends on DOM measurements and resize/font settings. Re-check both scroll and paged reading modes after layout changes.
+- E-ink mode is controlled by a global `data-eink-mode` attribute and strips motion/shadows; avoid adding UI effects that ignore that mode.
+
 ## Coding Guidelines
 
 ### 1. Think Before Coding
