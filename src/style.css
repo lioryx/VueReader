@@ -3,3 +3,48 @@
 @import 'tailwindcss';
 /* import Konsta UI theme */
 @import 'konsta/vue/theme.css';
+
+html,
+body,
+#app {
+	width: 100%;
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	overflow: hidden;
+	overscroll-behavior: none;
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+}
+
+#app {
+	height: 100dvh;
+	overflow: hidden;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+	user-select: text;
+	-webkit-user-select: text;
+	-webkit-touch-callout: default;
+}
+
+.reader-selectable,
+.reader-selectable * {
+	user-select: text;
+	-webkit-user-select: text;
+	-webkit-touch-callout: default;
+}
+
+@media (display-mode: standalone) {
+	body {
+		position: fixed;
+		inset: 0;
+		width: 100%;
+		height: 100dvh;
+	}
+}

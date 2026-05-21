@@ -50,11 +50,12 @@ function finishPress() {
 
 <template>
   <div
-    class="cursor-pointer transition-transform active:scale-[0.99]"
+    class="pressable-book-item cursor-pointer select-none transition-transform active:scale-[0.99]"
     @pointerdown="startPress"
     @pointerup="finishPress"
     @pointerleave="clearPress"
     @pointercancel="clearPress"
+    @contextmenu.prevent
   >
     <BookCard
       :book="props.book"
@@ -65,3 +66,11 @@ function finishPress() {
     />
   </div>
 </template>
+
+<style scoped>
+.pressable-book-item {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+</style>

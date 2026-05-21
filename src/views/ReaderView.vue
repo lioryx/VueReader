@@ -403,12 +403,12 @@ function stopTTS() {
 
     <!-- ── Content: fills the full screen ─────────────────────────────────── -->
     <div ref="contentEl" class="absolute inset-0"
-      :class="settings.pageMode === 'page' ? 'select-none' : 'overflow-y-auto'" @click="onContentClick">
+      :class="settings.pageMode === 'page' ? '' : 'overflow-y-auto'" @click="onContentClick">
       <!-- Scroll mode -->
       <template v-if="settings.pageMode === 'scroll'">
         <div class="max-w-2xl mx-auto px-5 pb-40"
           :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(env(safe-area-inset-bottom) + ${contentBottomInset} + 6rem)` }">
-          <p v-for="(para, i) in displayParas" :key="i" class="mb-4 rounded transition-colors duration-300"
+          <p v-for="(para, i) in displayParas" :key="i" class="reader-selectable mb-4 rounded transition-colors duration-300"
             :style="[
               { fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em', fontFamily: fontFamilyStyle },
               speaking && ttsParaIdx === i ? activeReadingStyle : undefined,
@@ -445,7 +445,7 @@ function stopTTS() {
               <div :key="`${reader.chapterIndex}-${pageIndex}`"
                 class="absolute inset-0 px-5 pt-3 overflow-hidden flex flex-col">
                 <div class="flex-1 overflow-hidden">
-                  <div v-for="(line, i) in currentPageLines" :key="i" class="rounded transition-colors duration-300"
+                  <div v-for="(line, i) in currentPageLines" :key="i" class="reader-selectable rounded transition-colors duration-300"
                     :style="[
                       { fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: line.isParaStart ? '2em' : '0', marginBottom: line.isParaEnd ? '12px' : '0', fontFamily: fontFamilyStyle },
                       speaking && ttsParaIdx === line.paraIndex ? activeReadingStyle : undefined,
