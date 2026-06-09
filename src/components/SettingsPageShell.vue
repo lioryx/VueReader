@@ -31,7 +31,7 @@ const shellStyle = computed(() => ({
 </script>
 
 <template>
-  <div class="settings-shell h-screen flex flex-col" :style="shellStyle">
+  <div class="settings-shell h-full flex flex-col" :style="shellStyle">
     <div class="px-4 pb-4 pt-6 border-b" style="padding-top: calc(env(safe-area-inset-top) + 1rem)">
       <div class="flex items-center gap-3">
         <button class="p-1 -ml-1 text-gray-600" @click="router.back()">

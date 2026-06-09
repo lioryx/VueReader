@@ -162,7 +162,7 @@ function formatReadTime(secs: number) {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col" :style="pageStyle">
+  <div class="h-full flex flex-col" :style="pageStyle">
     <div class="border-b px-4 pb-4" :style="headerStyle" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
       <div class="flex items-center gap-2 pt-1">
         <button class="p-2 -ml-2" :style="mutedTextStyle" @click="goBack">
@@ -222,8 +222,8 @@ function formatReadTime(secs: number) {
       </div>
     </div>
 
-    <div class="fixed bottom-0 left-0 right-0 border-t px-4 pb-4 pt-3" :style="headerStyle">
-      <div class="grid grid-cols-3 gap-3" style="padding-bottom: max(env(safe-area-inset-bottom), 0.25rem)">
+    <div class="fixed bottom-0 left-0 right-0 border-t px-4 pt-3" :style="[headerStyle, { paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }]">
+      <div class="grid grid-cols-3 gap-3">
         <button class="rounded-2xl border px-4 py-3 text-base font-medium" :style="dangerButtonStyle" @click="removeBook">删除书籍</button>
         <button class="rounded-2xl border px-4 py-3 text-base font-medium" :style="secondaryButtonStyle" @click="openCatalog">查看目录</button>
         <button class="rounded-2xl px-4 py-3 text-base font-semibold" :style="primaryButtonStyle" @click="openReader">继续阅读</button>

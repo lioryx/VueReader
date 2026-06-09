@@ -29,8 +29,8 @@ function goTo(path: '/' | '/settings') {
 </script>
 
 <template>
-  <div class="border-t px-6 pt-2" :style="barStyle">
-    <div class="grid grid-cols-2" style="padding-bottom: max(env(safe-area-inset-bottom), 0.5rem)">
+  <div class="border-t px-6 pt-1" :style="[barStyle, { paddingBottom: 'env(safe-area-inset-bottom)' }]">
+    <div class="grid grid-cols-2">
       <button
         class="flex flex-col items-center justify-center gap-1 py-2 text-xs font-medium"
         :style="props.active === 'bookshelf' ? activeItemStyle : inactiveItemStyle"

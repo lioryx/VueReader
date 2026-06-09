@@ -399,7 +399,7 @@ function stopTTS() {
 
 <template>
   <!-- Outer: relative so absolute children are positioned against the viewport -->
-  <div class="relative h-screen overflow-hidden" :style="bgStyle">
+  <div class="relative h-full overflow-hidden" :style="bgStyle">
 
     <!-- ── Content: fills the full screen ─────────────────────────────────── -->
     <div ref="contentEl" class="absolute inset-0"
@@ -407,7 +407,7 @@ function stopTTS() {
       <!-- Scroll mode -->
       <template v-if="settings.pageMode === 'scroll'">
         <div class="max-w-2xl mx-auto px-5 pb-40"
-          :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(env(safe-area-inset-bottom) + ${contentBottomInset} + 6rem)` }">
+          :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(${contentBottomInset} + 6rem)` }">
           <p v-for="(para, i) in displayParas" :key="i" class="reader-selectable mb-4 rounded transition-colors duration-300"
             :style="[
               { fontSize: `${settings.fontSize}px`, lineHeight: settings.lineHeight, textIndent: '2em', fontFamily: fontFamilyStyle },
@@ -438,7 +438,7 @@ function stopTTS() {
            pagination is computed against the same area regardless of bar state -->
       <template v-else>
         <div class="absolute inset-0 flex flex-col"
-          :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(env(safe-area-inset-bottom) + ${contentBottomInset})` }">
+          :style="{ paddingTop: `calc(env(safe-area-inset-top) + ${contentTopInset})`, paddingBottom: `calc(${contentBottomInset})` }">
           <!-- pageTextAreaEl: measured by updateCharsPerPage -->
           <div ref="pageTextAreaEl" class="relative flex-1 overflow-hidden">
             <Transition :name="pageTransition">
@@ -470,7 +470,7 @@ function stopTTS() {
         </div>
       </div>
 
-      <div class="absolute bottom-0 inset-x-0 px-5 pb-4" style="padding-bottom: calc(env(safe-area-inset-bottom) + 1rem)" :style="infoBarStyle">
+      <div class="absolute bottom-0 inset-x-0 px-5 pb-4" :style="infoBarStyle">
         <div class="flex items-end justify-between gap-4 text-sm leading-none">
           <p class="min-w-0 flex-1 truncate">{{ reader.currentChapter?.title || '暂无章节' }}</p>
           <p class="shrink-0 tabular-nums">{{ pageInfoCurrent }} / {{ pageInfoTotal }}</p>

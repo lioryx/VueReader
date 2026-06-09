@@ -32,7 +32,7 @@ function open(path: string) {
 </script>
 
 <template>
-  <div class="settings-home h-screen flex flex-col" :style="pageStyle">
+  <div class="settings-home h-full flex flex-col" :style="pageStyle">
     <div class="px-4 pb-4 pt-6 border-b" style="padding-top: calc(env(safe-area-inset-top) + 1rem)">
       <div class="flex items-center gap-3">
         <h1 class="text-lg font-semibold">设置</h1>

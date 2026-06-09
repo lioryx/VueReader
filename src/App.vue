@@ -105,7 +105,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="h-screen overflow-hidden">
+  <div class="h-full overflow-hidden">
     <Transition name="slide-up">
       <div
         v-if="showUpdateBanner"

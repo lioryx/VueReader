@@ -21,8 +21,8 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="absolute bottom-0 inset-x-0 pointer-events-auto border-t px-5 pt-4 pb-4 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl"
-    :style="props.chromeStyle">
+  <div class="absolute bottom-0 inset-x-0 pointer-events-auto border-t px-5 pt-3 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl"
+    :style="[props.chromeStyle, { paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }]">
     <div class="flex items-center gap-4 text-sm">
       <button class="shrink-0 opacity-80 disabled:opacity-30" :disabled="!props.canGoPrev" @click="emit('prev')">
         上一章
@@ -40,7 +40,7 @@ const emit = defineEmits<{
         下一章
       </button>
     </div>
-    <div class="mt-4 grid grid-cols-4 gap-2 text-center">
+    <div class="mt-3 grid grid-cols-4 gap-2 text-center">
       <button class="flex flex-col items-center gap-1.5 py-1" @click="emit('openChapterDrawer')">
         <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h16" />

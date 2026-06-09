@@ -184,7 +184,7 @@ async function onDrop(e: DragEvent) {
 
 <template>
   <div
-    class="h-screen flex flex-col"
+    class="h-full flex flex-col"
     :style="[viewStyle, dragStyle]"
     @dragover="onDragOver"
     @dragleave="onDragLeave"

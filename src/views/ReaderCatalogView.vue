@@ -159,7 +159,7 @@ const currentChapterLabel = computed(() =>
 </script>
 
 <template>
-  <div class="h-screen flex flex-col" :style="pageStyle">
+  <div class="h-full flex flex-col" :style="pageStyle">
     <div class="border-b" :style="headerStyle">
       <div class="px-4 pt-4" style="padding-top: calc(env(safe-area-inset-top) + 0.75rem)">
         <div class="flex items-center gap-2">
@@ -251,7 +251,7 @@ const currentChapterLabel = computed(() =>
       </template>
     </div>
 
-    <div class="border-t px-4 py-3" :style="bottomBarStyle" style="padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem)">
+    <div class="border-t px-4 py-3 pb-4" :style="bottomBarStyle">
       <div class="flex items-center gap-3">
         <p class="min-w-0 flex-1 truncate text-sm">{{ currentChapterLabel }}</p>
         <button class="p-1.5 disabled:opacity-30" :style="actionButtonStyle" :disabled="reader.chapterIndex <= 0" @click="moveChapter(-1)">
