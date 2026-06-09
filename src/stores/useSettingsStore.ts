@@ -254,7 +254,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const fontSize = useLocalStorage<number>('jd-font-size', 18)
   const lineHeight = useLocalStorage<number>('jd-line-height', 1.8)
   const fontFamily = useLocalStorage<'system' | 'serif' | 'mono'>('jd-font-family', 'system')
-  const pageMode = useLocalStorage<'scroll' | 'page'>('jd-page-mode', 'scroll')
+  const pageMode = useLocalStorage<'scroll' | 'page'>('jd-page-mode', 'page')
   const ttsRate = useLocalStorage<number>('jd-tts-rate', 1.2)
   const themeMode = useLocalStorage<'standard' | 'eink'>('jd-theme-mode', 'standard')
   const tocRule = useLocalStorage<string>('jd-toc-rule', '^第.{1,9}(章|节|卷|回)')
